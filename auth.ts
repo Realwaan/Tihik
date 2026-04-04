@@ -7,6 +7,8 @@ import bcrypt from "bcryptjs";
 
 import { prisma } from "@/lib/prisma";
 
+const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+const hasDatabase = Boolean(process.env.DATABASE_URL);
 const hasGoogleOAuth = Boolean(
   process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
 );
@@ -60,7 +62,8 @@ if (hasGoogleOAuth) {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  adapter: hasDatabase ? PrismaAdapter(prisma) : undefined,
+  secret: authSecret,
   trustHost: true,
   session: {
     strategy: "jwt", // Changed from "database" to "jwt" to fix edge runtime issue
