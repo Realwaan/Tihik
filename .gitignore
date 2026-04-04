@@ -1,0 +1,29 @@
+node_modules/
+
+# Next.js build outputs
+.next/
+out/
+
+# Local environment files (keep example template only)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Vercel local project metadata
+.vercel/
+
+# Misc local logs
+*.log

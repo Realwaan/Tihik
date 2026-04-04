@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum HouseholdRole {
+  OWNER
+  MEMBER
+}
+
+enum Currency {
+  USD
+  EUR
+  GBP
+  JPY
+  CAD
+  AUD
+  PHP
+}
+
+model User {
+  id                  String                @id @default(cuid())
+  name                String?
+  email               String?               @unique
+  emailVerified       DateTime?
+  image               String?
+  password            String?               // For credentials login
+  preferredCurrency   Currency              @default(USD)
+  accounts            Account[]
+  sessions            Session[]
+  transactions        Transaction[]
+  budgets             Budget[]
+  recurringTemplates  RecurringTransaction[]
+  ownedHouseholds     Household[]           @relation("HouseholdOwner")
+  householdMemberships HouseholdMember[]
+  paidSharedExpenses  SharedExpense[]       @relation("SharedExpensePayer")
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?   @db.Text
+  access_token      String?   @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?   @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([sessionToken])
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model Transaction {
+  id                  String               @id @default(cuid())
+  amount              Float
+  currency            Currency             @default(USD)
+  type                TransactionType
+  category            String
+  note                String?
+  date                DateTime
+  userId              String
+  sourceRecurringId   String?
+  recurrenceOccurrence DateTime?
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceRecurring     RecurringTransaction? @relation(fields: [sourceRecurringId], references: [id], onDelete: SetNull)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, type, date])
+  @@index([userId, category])
+  @@index([sourceRecurringId])
+  @@unique([sourceRecurringId, recurrenceOccurrence])
+}
+
+model Budget {
+  id        String   @id @default(cuid())
+  userId    String
+  category  String
+  limit     Float
+  month     DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, category, month])
+  @@index([userId, month])
+}
+
+model RecurringTransaction {
+  id          String              @id @default(cuid())
+  userId      String
+  amount      Float
+  currency    Currency            @default(USD)
+  type        TransactionType
+  category    String
+  note        String?
+  frequency   RecurrenceFrequency
+  interval    Int                 @default(1)
+  startDate   DateTime
+  nextRunDate DateTime
+  endDate     DateTime?
+  isActive    Boolean             @default(true)
+  lastRunAt   DateTime?
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generated   Transaction[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([userId, nextRunDate])
+  @@index([userId, isActive])
+}
+
+model Household {
+  id          String            @id @default(cuid())
+  name        String
+  ownerId     String
+  owner       User              @relation("HouseholdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     HouseholdMember[]
+  expenses    SharedExpense[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([ownerId])
+}
+
+model HouseholdMember {
+  id          String        @id @default(cuid())
+  householdId String
+  userId      String
+  role        HouseholdRole @default(MEMBER)
+  household   Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([householdId, userId])
+  @@index([userId])
+}
+
+model SharedExpense {
+  id           String      @id @default(cuid())
+  householdId  String
+  paidByUserId String
+  amount       Float
+  currency     Currency    @default(USD)
+  category     String
+  description  String?
+  date         DateTime
+  household    Household   @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  paidByUser   User        @relation("SharedExpensePayer", fields: [paidByUserId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([householdId, date])
+  @@index([paidByUserId, date])
+}

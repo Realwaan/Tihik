@@ -1,0 +1,112 @@
+import { NextRequest, NextResponse } from "next/server";
+
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { toMonthStart } from "@/lib/budget";
+import { budgetUpdateSchema } from "@/lib/validations/budget";
+
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await context.params;
+    const existing = await prisma.budget.findFirst({
+      where: {
+        id,
+        userId: session.user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Budget not found" }, { status: 404 });
+    }
+
+    const json = await request.json().catch(() => null);
+
+    if (!json) {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const parsed = budgetUpdateSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation error", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    if (Object.keys(parsed.data).length === 0) {
+      return NextResponse.json(
+        { error: "No fields provided for update" },
+        { status: 400 }
+      );
+    }
+
+    const updated = await prisma.budget.update({
+      where: { id },
+      data: {
+        ...(parsed.data.category ? { category: parsed.data.category } : {}),
+        ...(parsed.data.limit ? { limit: parsed.data.limit } : {}),
+        ...(parsed.data.month ? { month: toMonthStart(parsed.data.month) } : {}),
+      },
+    });
+
+    return NextResponse.json({ data: updated }, { status: 200 });
+  } catch (error) {
+    console.error("Failed to update budget", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(_request: NextRequest, context: RouteContext) {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await context.params;
+    const existing = await prisma.budget.findFirst({
+      where: {
+        id,
+        userId: session.user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Budget not found" }, { status: 404 });
+    }
+
+    await prisma.budget.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    console.error("Failed to delete budget", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}

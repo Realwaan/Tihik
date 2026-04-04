@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="TrackIt icon">
+  <rect width="192" height="192" rx="36" fill="#0f172a"/>
+  <circle cx="96" cy="96" r="54" fill="#f59e0b" opacity="0.2"/>
+  <path d="M58 117h76v12H58z" fill="#f59e0b"/>
+  <path d="M66 95h20v22H66zM94 77h20v40H94zM122 61h20v56h-20z" fill="#f8fafc"/>
+</svg>
