@@ -6,9 +6,7 @@ import { Loader2, Plus, Trash2, Download, FileUp } from "lucide-react";
 import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { CategoryCombobox } from "@/components/ui/category-combobox";
-import { WalletCategoryBadge } from "@/components/ui/wallet-category-badge";
 import { mergeCategories } from "@/lib/categories";
-import { inferCanonicalWalletCategory } from "@/lib/wallet-normalization";
 import { parseReceiptText } from "@/lib/receipt-parser";
 
 import { transactionCreateSchema } from "@/lib/validations/transaction";
@@ -48,8 +46,6 @@ const initialForm: TransactionFormState = {
   date: new Date().toISOString().slice(0, 10),
 };
 
-const NORMALIZE_HINT_STORAGE_KEY = "trackit.normalize.hint.dismissed.v1";
-
 export function TransactionsManager() {
   const { showToast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -65,9 +61,6 @@ export function TransactionsManager() {
   const [scanningReceipt, setScanningReceipt] = useState(false);
   const [suggestingCategory, setSuggestingCategory] = useState(false);
   const [importingCsv, setImportingCsv] = useState(false);
-  const [normalizingCategory, setNormalizingCategory] = useState<string | null>(null);
-  const [dismissedNormalizeHint, setDismissedNormalizeHint] = useState(false);
-  const [showNormalizeHint, setShowNormalizeHint] = useState(false);
   const [receiptSource, setReceiptSource] = useState<string | null>(null);
   const [receiptCrop, setReceiptCrop] = useState<ReceiptCrop>({
     x: 0,
@@ -113,17 +106,6 @@ export function TransactionsManager() {
   }, []);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(NORMALIZE_HINT_STORAGE_KEY);
-      if (raw === "1") {
-        setDismissedNormalizeHint(true);
-      }
-    } catch {
-      // ignore local storage read failures
-    }
-  }, []);
-
-  useEffect(() => {
     setAllCategories(
       mergeCategories(
         transactions
@@ -140,7 +122,7 @@ export function TransactionsManager() {
 
     const parsed = transactionCreateSchema.safeParse({
       amount: form.amount,
-      currency: form.currency,
+      currency: preferredCurrency,
       type: form.type,
       category: form.category,
       note: form.note || undefined,
@@ -196,50 +178,6 @@ export function TransactionsManager() {
       const errorMsg = "Could not delete the transaction.";
       setError(errorMsg);
       showToast("error", errorMsg);
-    }
-  }
-
-  async function normalizeCategoryAcrossTransactions(fromCategory: string, toCategory: string) {
-    const targets = transactions.filter(
-      (item) => item.category.trim().toLowerCase() === fromCategory.trim().toLowerCase()
-    );
-
-    if (targets.length === 0) {
-      return;
-    }
-
-    try {
-      setNormalizingCategory(fromCategory);
-
-      await Promise.all(
-        targets.map(async (item) => {
-          const response = await fetch(`/api/transactions/${item.id}`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ category: toCategory }),
-          });
-
-          if (!response.ok) {
-            throw new Error("Failed transaction category normalization");
-          }
-        })
-      );
-
-      setTransactions((current) =>
-        current.map((item) =>
-          item.category.trim().toLowerCase() === fromCategory.trim().toLowerCase()
-            ? { ...item, category: toCategory }
-            : item
-        )
-      );
-
-      showToast("success", `Normalized ${targets.length} transaction${targets.length > 1 ? "s" : ""} to ${toCategory}.`);
-    } catch {
-      showToast("error", "Could not normalize category right now.");
-    } finally {
-      setNormalizingCategory(null);
     }
   }
 
@@ -476,7 +414,6 @@ export function TransactionsManager() {
       setForm((current) => ({
         ...current,
         amount: parsed.amount ? parsed.amount.toFixed(2) : current.amount,
-        currency: parsed.currency ?? current.currency,
         category: parsed.category ?? current.category,
         date: parsed.date ?? current.date,
         note:
@@ -572,36 +509,18 @@ export function TransactionsManager() {
     return matchesSearch && matchesType;
   });
 
-  const hasNormalizationSuggestions = filteredTransactions.some((transaction) => {
-    const canonical = inferCanonicalWalletCategory(transaction.category);
-    return Boolean(
-      canonical && canonical.toLowerCase() !== transaction.category.trim().toLowerCase()
-    );
-  });
-
-  useEffect(() => {
-    if (dismissedNormalizeHint || !hasNormalizationSuggestions) {
-      setShowNormalizeHint(false);
-      return;
-    }
-    setShowNormalizeHint(true);
-  }, [dismissedNormalizeHint, hasNormalizationSuggestions]);
-
-  function dismissNormalizeHint() {
-    setShowNormalizeHint(false);
-    setDismissedNormalizeHint(true);
-    try {
-      window.localStorage.setItem(NORMALIZE_HINT_STORAGE_KEY, "1");
-    } catch {
-      // ignore local storage write failures
-    }
-  }
-
   return (
     <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
       <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-black/30 sm:p-6">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Add transaction</h2>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Quickly log income and expenses.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Add transaction</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Quickly log income and expenses.</p>
+          </div>
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-200">
+            {preferredCurrency} profile currency
+          </span>
+        </div>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -628,27 +547,6 @@ export function TransactionsManager() {
             </Field>
           </div>
 
-          <Field label="Currency">
-            <select
-              value={form.currency}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  currency: event.target.value as TransactionFormState["currency"],
-                }))
-              }
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-            >
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-              <option value="GBP">GBP</option>
-              <option value="JPY">JPY</option>
-              <option value="CAD">CAD</option>
-              <option value="AUD">AUD</option>
-              <option value="PHP">PHP</option>
-            </select>
-          </Field>
-
           <Field label="Category">
             <CategoryCombobox
               value={form.category}
@@ -666,8 +564,14 @@ export function TransactionsManager() {
           </Field>
 
           {form.type === "EXPENSE" ? (
-            <Field label="Receipt scanner">
-              <div className="space-y-2">
+            <details className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-950/40">
+              <summary className="cursor-pointer list-none text-sm font-medium text-slate-700 dark:text-slate-300">
+                Optional tools
+                <span className="ml-2 text-xs font-normal text-slate-500 dark:text-slate-400">
+                  receipt scanner
+                </span>
+              </summary>
+              <div className="mt-4 space-y-2">
                 <input
                   type="file"
                   accept="image/*"
@@ -800,7 +704,7 @@ export function TransactionsManager() {
                   </p>
                 ) : null}
               </div>
-            </Field>
+            </details>
           ) : null}
 
           <Field label="Note">
@@ -841,73 +745,63 @@ export function TransactionsManager() {
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Recent transactions</h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Sorted by newest first.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {transactions.length > 0 ? (
-              <>
-                <button
-                  onClick={exportToCSV}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none"
-                >
-                  <Download className="h-4 w-4" />
-                  Export CSV
-                </button>
-                <button
-                  onClick={exportToPDF}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none"
-                >
-                  <Download className="h-4 w-4" />
-                  Export PDF
-                </button>
-              </>
-            ) : null}
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none">
-              <FileUp className="h-4 w-4" />
-              {importingCsv ? "Importing..." : "Import CSV"}
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={handleCsvImport}
-                disabled={importingCsv}
-                className="hidden"
-              />
-            </label>
-          </div>
+          <details className="group rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/40">
+            <summary className="cursor-pointer list-none text-sm font-medium text-slate-700 dark:text-slate-300">
+              More actions
+              <span className="ml-2 text-xs font-normal text-slate-500 dark:text-slate-400">
+                import or export
+              </span>
+            </summary>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {transactions.length > 0 ? (
+                <>
+                  <button
+                    onClick={exportToCSV}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={exportToPDF}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export PDF
+                  </button>
+                </>
+              ) : null}
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none">
+                <FileUp className="h-4 w-4" />
+                {importingCsv ? "Importing..." : "Import CSV"}
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleCsvImport}
+                  disabled={importingCsv}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </details>
         </div>
 
-        {/* Search and Filter */}
         {transactions.length > 0 && (
-          <div className="mb-6 space-y-3">
-            {showNormalizeHint ? (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-900/20 dark:text-emerald-200">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <p>
-                    Normalize category is available. Use it to quickly standardize wallet and bank labels across matching transactions.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={dismissNormalizeHint}
-                    className="inline-flex items-center justify-center rounded-full border border-emerald-300/80 bg-white/80 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-white dark:border-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-300"
-                  >
-                    Got it
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
+          <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-950/30">
             <div className="flex flex-col gap-3 sm:flex-row">
               <input
                 type="text"
                 placeholder="Search transactions..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-400"
+                className="flex-1 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-amber-400 focus:outline-none focus:ring-4 focus:ring-amber-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-400"
               />
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setFilterType("ALL")}
-                  className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                  className={`cursor-pointer rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
                     filterType === "ALL"
-                      ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                      ? "border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
                       : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                   }`}
                 >
@@ -915,9 +809,9 @@ export function TransactionsManager() {
                 </button>
                 <button
                   onClick={() => setFilterType("INCOME")}
-                  className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                  className={`cursor-pointer rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
                     filterType === "INCOME"
-                      ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200"
                       : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                   }`}
                 >
@@ -925,9 +819,9 @@ export function TransactionsManager() {
                 </button>
                 <button
                   onClick={() => setFilterType("EXPENSE")}
-                  className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                  className={`cursor-pointer rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
                     filterType === "EXPENSE"
-                      ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                      ? "border-rose-500 bg-rose-50 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200"
                       : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                   }`}
                 >
@@ -964,31 +858,11 @@ export function TransactionsManager() {
                   <div>
                     <div className="flex items-center gap-3">
                       <p className="font-medium text-slate-900 dark:text-slate-100">{transaction.category}</p>
-                      <WalletCategoryBadge category={transaction.category} />
                       <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${transaction.type === "INCOME" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"}`}>
                         {transaction.type}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{transaction.note || transaction.date.slice(0, 10)}</p>
-                    {(() => {
-                      const canonical = inferCanonicalWalletCategory(transaction.category);
-                      if (!canonical || canonical.toLowerCase() === transaction.category.trim().toLowerCase()) {
-                        return null;
-                      }
-
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => normalizeCategoryAcrossTransactions(transaction.category, canonical)}
-                          disabled={normalizingCategory === transaction.category}
-                          className="mt-1 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50/80 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/45"
-                        >
-                          {normalizingCategory === transaction.category
-                            ? "Normalizing..."
-                            : `Normalize to ${canonical}`}
-                        </button>
-                      );
-                    })()}
                   </div>
                   <div className="flex items-center gap-4">
                     <p className={`text-sm font-semibold ${transaction.type === "INCOME" ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>

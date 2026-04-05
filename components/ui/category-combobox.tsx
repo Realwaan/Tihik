@@ -283,8 +283,13 @@ export function CategoryCombobox({
                       <span>{option}</span>
                       {walletBadge ? (
                         <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide ${walletBadge.toneClass}`}
+                          className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide ${walletBadge.toneClass}`}
                         >
+                          <span
+                            className={`inline-flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-br ${walletBadge.logoGradientClass} text-[8px] font-bold text-white`}
+                          >
+                            {walletBadge.logoText}
+                          </span>
                           {walletBadge.code}
                         </span>
                       ) : null}

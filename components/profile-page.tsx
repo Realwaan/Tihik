@@ -83,7 +83,7 @@ export function ProfilePage() {
   }
 
   return (
-    <main className="page-shell min-h-screen bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <main className="page-shell dock-safe min-h-screen bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-12">
         {/* Header */}
         <div className="mb-8 flex items-center gap-4">

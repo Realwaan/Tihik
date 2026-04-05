@@ -12,7 +12,7 @@ export default async function CollaborationPage() {
   }
 
   return (
-    <main className="page-shell min-h-screen bg-white px-4 py-6 pb-32 text-slate-900 dark:bg-slate-900 dark:text-slate-100 sm:px-6 sm:py-8 lg:px-10">
+    <main className="page-shell dock-safe min-h-screen bg-white px-4 pt-6 text-slate-900 dark:bg-slate-900 dark:text-slate-100 sm:px-6 sm:pt-8 lg:px-10">
       <div className="mx-auto max-w-7xl">
         <AppTopNav
           title="Collaboration"

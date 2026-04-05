@@ -4,11 +4,45 @@ export type WalletBadge = {
   toneClass: string;
   labelClass: string;
   iconToneClass: string;
+  logoText: string;
+  logoGradientClass: string;
 };
+
+type WalletBadgeSeed = Omit<WalletBadge, "logoText" | "logoGradientClass">;
+
+const WALLET_LOGO_GRADIENTS = [
+  "from-sky-500 to-blue-600",
+  "from-emerald-500 to-teal-600",
+  "from-amber-500 to-orange-600",
+  "from-lime-500 to-emerald-600",
+  "from-cyan-500 to-sky-600",
+  "from-violet-500 to-indigo-600",
+];
+
+const BANK_LOGO_GRADIENTS = [
+  "from-blue-600 to-indigo-700",
+  "from-rose-500 to-red-700",
+  "from-emerald-600 to-green-700",
+  "from-amber-600 to-orange-700",
+  "from-fuchsia-600 to-pink-700",
+  "from-slate-600 to-slate-800",
+];
+
+function normalizeLogoText(code: string) {
+  const compact = code.replace(/[^a-z0-9]/gi, "").toUpperCase();
+  if (!compact) return "WL";
+  return compact.length <= 2 ? compact : compact.slice(0, 2);
+}
+
+function pickGradient(seed: string, kind: "wallet" | "bank") {
+  const source = kind === "bank" ? BANK_LOGO_GRADIENTS : WALLET_LOGO_GRADIENTS;
+  const hash = Array.from(seed).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return source[hash % source.length];
+}
 
 const WALLET_BADGES: Array<{
   keywords: string[];
-  badge: WalletBadge;
+  badge: WalletBadgeSeed;
 }> = [
   {
     keywords: ["gcash"],
@@ -240,5 +274,11 @@ export function getWalletBadge(category: string): WalletBadge | null {
     keywords.some((keyword) => normalized.includes(keyword))
   );
 
-  return matched?.badge ?? null;
+  if (!matched) return null;
+
+  return {
+    ...matched.badge,
+    logoText: normalizeLogoText(matched.badge.code),
+    logoGradientClass: pickGradient(normalized, matched.badge.kind),
+  };
 }

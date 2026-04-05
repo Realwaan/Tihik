@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, HandCoins, House, Repeat2, Users } from "lucide-react";
@@ -30,15 +30,63 @@ function isActivePath(pathname: string, href: string) {
 
 export function MobileNavDock() {
   const pathname = usePathname();
+  const [isMounted, setIsMounted] = useState(false);
   const [dockReady, setDockReady] = useState(false);
+  const dockRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
+    setIsMounted(true);
     const frame = window.requestAnimationFrame(() => setDockReady(true));
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
   }, []);
 
+  useEffect(() => {
+    if (!isMounted) {
+      return;
+    }
+
+    function updateDockClearance() {
+      if (!dockRef.current) return;
+
+      const rect = dockRef.current.getBoundingClientRect();
+      const bottomGap = Math.max(0, window.innerHeight - rect.bottom);
+      const clearance = Math.ceil(rect.height + bottomGap + 20);
+      document.documentElement.style.setProperty("--trackit-dock-clearance", `${clearance}px`);
+    }
+
+    updateDockClearance();
+    const raf = window.requestAnimationFrame(updateDockClearance);
+    const timeoutId = window.setTimeout(updateDockClearance, 120);
+
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => updateDockClearance())
+        : null;
+
+    if (observer && dockRef.current) {
+      observer.observe(dockRef.current);
+    }
+
+    window.addEventListener("resize", updateDockClearance);
+    window.addEventListener("orientationchange", updateDockClearance);
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(timeoutId);
+      observer?.disconnect();
+      window.removeEventListener("resize", updateDockClearance);
+      window.removeEventListener("orientationchange", updateDockClearance);
+    };
+  }, [isMounted, pathname]);
+
+  if (!isMounted) {
+    return null;
+  }
+
   return (
-    <nav className="fixed inset-x-0 bottom-3 z-40 px-3 lg:bottom-4">
+    <nav ref={dockRef} className="fixed inset-x-0 bottom-2 z-40 px-3 lg:bottom-2">
       <div className="mx-auto flex max-w-5xl items-center justify-between rounded-3xl border border-slate-200/80 bg-white/90 px-2 py-2 shadow-lg backdrop-blur dark:border-slate-700/80 dark:bg-slate-900/90 lg:max-w-3xl lg:rounded-2xl lg:border-white/15 lg:bg-white/75 lg:px-1.5 lg:py-1.5 lg:shadow-[0_12px_30px_rgba(15,23,42,0.14)] dark:lg:bg-slate-900/75 dark:lg:shadow-[0_12px_30px_rgba(2,6,23,0.5)]">
         {navItems.map((item, index) => {
           const Icon = item.icon;

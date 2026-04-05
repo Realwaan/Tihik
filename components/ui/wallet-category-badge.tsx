@@ -19,6 +19,11 @@ export function WalletCategoryBadge({ category, className = "" }: WalletCategory
       title={`${category} wallet badge`}
     >
       <span
+        className={`inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br ${walletBadge.logoGradientClass} text-[9px] font-bold text-white shadow-sm`}
+      >
+        {walletBadge.logoText}
+      </span>
+      <span
         className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${walletBadge.iconToneClass}`}
       >
         <Icon className="h-2.5 w-2.5" />

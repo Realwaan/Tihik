@@ -1,4 +1,4 @@
-const sw = `const STATIC_CACHE = "trackit-static-v2";
+const sw = `const STATIC_CACHE = "trackit-static-v3";
 const PRECACHE_URLS = ["/", "/signin", "/signup"];
 
 self.addEventListener("install", (event) => {
@@ -33,6 +33,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+   // Never cache Next.js build assets. Serving stale chunks causes hydration mismatches.
+  if (url.pathname.startsWith("/_next/") || url.pathname === "/sw.js") {
+    return;
+  }
+
   // Keep app navigations network-first so auth redirects and fresh HTML are never stale.
   if (event.request.mode === "navigate") {
     event.respondWith(
@@ -49,7 +54,12 @@ self.addEventListener("fetch", (event) => {
 
       return fetch(event.request)
         .then((response) => {
-          if (!response || response.status !== 200 || response.type !== "basic") {
+          if (
+            !response ||
+            response.status !== 200 ||
+            response.type !== "basic" ||
+            !url.origin.startsWith(self.location.origin)
+          ) {
             return response;
           }
 
