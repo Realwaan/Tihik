@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
+import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { CategoryCombobox } from "@/components/ui/category-combobox";
 import { mergeCategories } from "@/lib/categories";
@@ -357,9 +358,12 @@ export function RecurringManager() {
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, index) => (
-                <div
+                <Skeleton
                   key={index}
-                  className="h-16 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-700"
+                  variant="rounded"
+                  animation="wave"
+                  height={64}
+                  className="rounded-2xl"
                 />
               ))}
             </div>
