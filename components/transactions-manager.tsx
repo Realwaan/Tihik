@@ -3,6 +3,7 @@
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Plus, Trash2, Download } from "lucide-react";
+import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { CategoryCombobox } from "@/components/ui/category-combobox";
 import { mergeCategories } from "@/lib/categories";
@@ -356,8 +357,8 @@ export function TransactionsManager() {
   });
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[0.95fr_1.05fr]">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-black/30">
+    <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-black/30 sm:p-6">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Add transaction</h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Quickly log income and expenses.</p>
 
@@ -593,7 +594,7 @@ export function TransactionsManager() {
         </form>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-black/30">
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-black/30 sm:p-6">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Recent transactions</h2>
@@ -659,7 +660,13 @@ export function TransactionsManager() {
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="h-16 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800/80" />
+                <Skeleton
+                  key={index}
+                  variant="rounded"
+                  animation="wave"
+                  height={64}
+                  className="rounded-2xl"
+                />
               ))}
             </div>
           ) : filteredTransactions.length === 0 ? (

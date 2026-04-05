@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Loader2, Plus, Trash2 } from "lucide-react";
+import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -167,7 +168,7 @@ export function BudgetsManager() {
   }, [budgets]);
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[0.95fr_1.05fr]">
+    <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
       <Card className="rounded-3xl">
         <CardHeader>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -273,9 +274,12 @@ export function BudgetsManager() {
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, index) => (
-                <div
+                <Skeleton
                   key={index}
-                  className="h-16 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-700"
+                  variant="rounded"
+                  animation="wave"
+                  height={64}
+                  className="rounded-2xl"
                 />
               ))}
             </div>

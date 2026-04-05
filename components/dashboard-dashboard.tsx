@@ -16,6 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import Skeleton from "@mui/material/Skeleton";
 
 import { SignOutButton } from "@/components/auth-buttons";
 import { Button } from "@/components/ui/button";
@@ -217,41 +218,41 @@ export function DashboardDashboard() {
   return (
     <main className="page-shell min-h-screen bg-white text-slate-900 dark:bg-gradient-to-b dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-slate-100">
       <div className="reveal border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-10">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-10">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-600 dark:text-amber-400">TrackIt</p>
-            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Dashboard</h1>
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-amber-600 dark:text-amber-400 sm:text-xs">TrackIt</p>
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">Dashboard</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <a href="/transactions">
-              <Button variant="outline">
-              <RefreshCcw className="h-4 w-4" />
-              Transactions
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-3">
+            <a href="/transactions" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full justify-center sm:w-auto">
+                <RefreshCcw className="h-4 w-4" />
+                Transactions
               </Button>
             </a>
-            <a href="/budgets">
-              <Button variant="outline">
-              <Target className="h-4 w-4" />
-              Budgets
+            <a href="/budgets" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full justify-center sm:w-auto">
+                <Target className="h-4 w-4" />
+                Budgets
               </Button>
             </a>
-            <a href="/collaboration">
-              <Button variant="outline">
-              <Users className="h-4 w-4" />
-              Collaboration
+            <a href="/collaboration" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full justify-center sm:w-auto">
+                <Users className="h-4 w-4" />
+                Collaboration
               </Button>
             </a>
-            <a href="/profile">
-              <Button variant="outline">
-              <User className="h-4 w-4" />
-              Profile
+            <a href="/profile" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full justify-center sm:w-auto">
+                <User className="h-4 w-4" />
+                Profile
               </Button>
             </a>
-            <div className="relative" ref={notificationsRef}>
+            <div className="relative col-span-2 w-full sm:col-span-1 sm:w-auto" ref={notificationsRef}>
               <button
                 type="button"
                 onClick={toggleNotifications}
-                className="relative inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none"
+                className="relative inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none sm:w-auto"
               >
                 <Bell className="h-4 w-4" />
                 Notifications
@@ -263,7 +264,7 @@ export function DashboardDashboard() {
               </button>
 
               {notificationsOpen ? (
-                <div className="absolute right-0 z-30 mt-2 w-[360px] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                <div className="absolute right-0 z-30 mt-2 w-[calc(100vw-1.5rem)] max-w-[360px] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:w-[360px]">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                       Notifications ({unreadCount} unread)
@@ -289,9 +290,12 @@ export function DashboardDashboard() {
                   <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
                     {loadingNotifications ? (
                       Array.from({ length: 3 }).map((_, index) => (
-                        <div
+                        <Skeleton
                           key={index}
-                          className="h-16 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-700"
+                          variant="rounded"
+                          animation="wave"
+                          height={64}
+                          className="rounded-xl"
                         />
                       ))
                     ) : notifications.length === 0 ? (
@@ -354,24 +358,30 @@ export function DashboardDashboard() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 py-8 lg:px-10">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
         {loading ? (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="h-28 animate-pulse rounded-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/80" />
+              <Skeleton
+                key={index}
+                variant="rounded"
+                animation="wave"
+                height={104}
+                className="rounded-3xl"
+              />
             ))}
           </div>
         ) : error ? (
           <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-rose-700">{error}</div>
         ) : (
           <>
-            <section className="grid gap-4 md:grid-cols-3">
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <MetricCard label="Current balance" value={formatCurrency(data?.currentBalance ?? 0, preferredCurrency)} icon={Wallet} accent="amber" />
               <MetricCard label="Total income" value={formatCurrency(data?.totalIncome ?? 0, preferredCurrency)} icon={ArrowUpRight} accent="emerald" />
               <MetricCard label="Total expenses" value={formatCurrency(data?.totalExpenses ?? 0, preferredCurrency)} icon={PieChart} accent="rose" />
             </section>
 
-            <section className="mt-8 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] sm:mt-8">
               <Card className="rounded-3xl dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40">
                 <CardHeader className="flex items-center justify-between gap-4">
                   <div>
@@ -379,23 +389,23 @@ export function DashboardDashboard() {
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">This month’s breakdown for quick review.</p>
                   </div>
                 </CardHeader>
-                <CardContent className="mt-2 w-full">
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/50">
-                    <div className="h-72 w-full">
+                <CardContent className="mt-2 w-full px-0 sm:px-6">
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-950/50 sm:p-4">
+                    <div className="h-56 w-full sm:h-72">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ top: 8, right: 8, left: -8, bottom: 8 }} barSize={36}>
+                        <BarChart data={chartData} margin={{ top: 8, right: 8, left: -8, bottom: 8 }} barSize={24}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#cbd5e1" opacity={0.45} />
                           <XAxis
                             dataKey="category"
                             tickLine={false}
                             axisLine={false}
-                            tick={{ fill: "#64748b", fontSize: 12, fontWeight: 500 }}
+                            tick={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
                           />
                           <YAxis
                             tickLine={false}
                             axisLine={false}
-                            tick={{ fill: "#64748b", fontSize: 12 }}
-                            width={64}
+                            tick={{ fill: "#64748b", fontSize: 11 }}
+                            width={56}
                             tickFormatter={(value: number) => formatCompactCurrency(value, preferredCurrency)}
                           />
                           <Tooltip
@@ -414,7 +424,7 @@ export function DashboardDashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="rounded-3xl p-6 dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40">
+              <Card className="rounded-3xl p-4 dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40 sm:p-6">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Quick stats</h2>
                 <div className="mt-5 space-y-4">
                   <StatRow label="Top category" value={data?.expensesByCategory[0]?.category ?? "None yet"} />
@@ -426,8 +436,8 @@ export function DashboardDashboard() {
               </Card>
             </section>
 
-            <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40">
-              <div className="flex items-center justify-between gap-4">
+            <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40 sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Budget alerts</h2>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -436,7 +446,7 @@ export function DashboardDashboard() {
                 </div>
                 <a
                   href="/budgets"
-                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none"
+                  className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none sm:w-auto"
                 >
                   Manage budgets
                 </a>
@@ -499,8 +509,8 @@ export function DashboardDashboard() {
             </section>
 
             <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-              <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40">
-                <div className="flex items-center justify-between gap-4">
+              <article className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40 sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                       6-month trend
@@ -510,7 +520,7 @@ export function DashboardDashboard() {
                     </p>
                   </div>
                 </div>
-                <div className="mt-6 h-80 w-full">
+                <div className="mt-6 h-56 w-full sm:h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trendData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#cbd5e1" opacity={0.45} />
@@ -559,7 +569,7 @@ export function DashboardDashboard() {
                 </div>
               </article>
 
-              <aside className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40">
+              <aside className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40 sm:p-6">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Insights</h2>
                 <div className="mt-5 space-y-4">
                   <StatRow
@@ -606,14 +616,14 @@ function MetricCard({
   }[accent];
 
   return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40">
+    <article className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40 sm:p-6">
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-slate-500 dark:text-slate-400">{label}</p>
         <span className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border ${accentStyles}`}>
           <Icon className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-6 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{value}</p>
+      <p className="mt-6 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">{value}</p>
     </article>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { User, Mail, Calendar, ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 
 type UserData = {
   id: string;
@@ -78,16 +79,12 @@ export function ProfilePage() {
   }
 
   if (loading) {
-    return (
-      <div className="page-shell flex min-h-screen items-center justify-center bg-white dark:bg-slate-900">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
-    );
+    return <PageLoadingSkeleton variant="app" />;
   }
 
   return (
     <main className="page-shell min-h-screen bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
-      <div className="mx-auto max-w-4xl px-6 py-12">
+      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-12">
         {/* Header */}
         <div className="mb-8 flex items-center gap-4">
           <button

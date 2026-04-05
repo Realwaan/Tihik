@@ -12,7 +12,7 @@ export default async function TransactionsPage() {
   }
 
   return (
-    <main className="page-shell min-h-screen bg-white px-6 py-8 text-slate-900 dark:bg-gradient-to-b dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 lg:px-10">
+    <main className="page-shell min-h-screen bg-white px-4 py-6 text-slate-900 dark:bg-gradient-to-b dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:px-6 sm:py-8 lg:px-10">
       <div className="mx-auto max-w-7xl">
         <AppTopNav
           title="Transactions"

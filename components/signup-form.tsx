@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { Lock, Mail, User, ArrowRight } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 
@@ -58,22 +57,8 @@ export function SignupForm() {
         throw new Error(data.error || "Failed to create account");
       }
 
-      showToast("success", "Account created successfully!");
-
-      // Auto sign in after successful registration
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        showToast("warning", "Please sign in with your new account");
-        setTimeout(() => router.push("/"), 2000);
-      } else {
-        showToast("success", "Signed in! Redirecting to dashboard...");
-        setTimeout(() => router.push("/dashboard"), 1500);
-      }
+      showToast("success", "Account created. Please verify your email before collaboration access.");
+      setTimeout(() => router.push(`/signin?verifyEmail=${encodeURIComponent(email)}`), 1200);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Something went wrong";
       setError(errorMessage);
@@ -84,11 +69,11 @@ export function SignupForm() {
   }
 
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full max-w-md px-1 sm:px-0">
       {/* Card with proper light mode contrast */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-slate-900">Create Account</h1>
+          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Create Account</h1>
           <p className="mt-2 text-sm text-slate-600">
             Start tracking your expenses today
           </p>
@@ -120,7 +105,7 @@ export function SignupForm() {
                 required
                 disabled={loading}
                 placeholder="John Doe"
-                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500"
+                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500"
               />
             </div>
           </div>
@@ -144,7 +129,7 @@ export function SignupForm() {
                 required
                 disabled={loading}
                 placeholder="you@example.com"
-                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500"
+                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500"
               />
             </div>
           </div>
@@ -169,7 +154,7 @@ export function SignupForm() {
                 minLength={8}
                 disabled={loading}
                 placeholder="••••••••"
-                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500"
+                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500"
               />
             </div>
             <p className="mt-2 text-xs text-slate-500">
@@ -197,7 +182,7 @@ export function SignupForm() {
                 minLength={8}
                 disabled={loading}
                 placeholder="••••••••"
-                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500"
+                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500"
               />
             </div>
           </div>
@@ -206,7 +191,7 @@ export function SignupForm() {
           <button
             type="submit"
             disabled={loading}
-            className="group relative w-full cursor-pointer overflow-hidden rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/50 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+            className="group relative w-full cursor-pointer overflow-hidden rounded-lg bg-blue-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/50 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
           >
             <span className="flex items-center justify-center gap-2">
               {loading ? (

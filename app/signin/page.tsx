@@ -7,15 +7,21 @@ import { useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
 
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams?.get("callbackUrl") || "/dashboard";
   const error = searchParams?.get("error");
+  const verified = searchParams?.get("verified");
+  const verifyEmail = searchParams?.get("verifyEmail") || "";
   const [loading, setLoading] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
 
   const handleSignIn = async (provider: string) => {
     setLoading(provider);
@@ -83,6 +89,7 @@ function SignInForm() {
       return;
     }
 
+    setFormError(null);
     setLoading("credentials");
     const result = await signIn("credentials", {
       email: email.trim(),
@@ -92,6 +99,7 @@ function SignInForm() {
     });
 
     if (result?.error) {
+      setFormError("Invalid email or password.");
       setLoading(null);
       return;
     }
@@ -99,12 +107,57 @@ function SignInForm() {
     router.push(result?.url ?? callbackUrl);
   };
 
+  async function resendVerification() {
+    const targetEmail = (email || verifyEmail).trim();
+    if (!targetEmail) {
+      setFormError("Enter your email to resend verification.");
+      return;
+    }
+
+    try {
+      setResendLoading(true);
+      setResendMessage(null);
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: targetEmail }),
+      });
+
+      const json = (await response.json().catch(() => null)) as
+        | { message?: string; error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(json?.error || "Failed to resend verification email.");
+      }
+
+      setResendMessage(json?.message || "Verification email sent.");
+    } catch (resendError) {
+      setFormError(
+        resendError instanceof Error
+          ? resendError.message
+          : "Failed to resend verification email."
+      );
+    } finally {
+      setResendLoading(false);
+    }
+  }
+
+  const infoMessage =
+    verified === "1"
+      ? "Email verified successfully. You can now use collaboration features."
+      : verified === "invalid"
+      ? "Verification link is invalid or expired. Request a new one below."
+      : verifyEmail
+      ? `Please verify ${verifyEmail} to unlock collaboration management.`
+      : null;
+
   return (
-    <div className="page-shell flex min-h-screen items-center justify-center bg-gradient-to-br from-white via-slate-50 to-slate-100 px-4 py-12 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
-      <div className="w-full max-w-md">
-        <Card className="rounded-3xl dark:border-slate-800 dark:bg-slate-900/95">
+    <div className="page-shell flex min-h-screen items-center justify-center bg-gradient-to-br from-white via-slate-50 to-slate-100 px-4 py-6 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:py-12">
+      <div className="w-full max-w-md px-1 sm:px-0">
+        <Card className="rounded-3xl border-slate-200 bg-white/95 dark:border-slate-800 dark:bg-slate-900/95">
           <CardHeader className="text-center">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Welcome to TrackIt</h1>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">Welcome to TrackIt</h1>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
               Choose your sign-in method
             </p>
@@ -124,7 +177,7 @@ function SignInForm() {
                 placeholder="Email address"
                 autoComplete="email"
                 disabled={loading !== null}
-                className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
+                className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
               />
               <input
                 type="password"
@@ -133,21 +186,47 @@ function SignInForm() {
                 placeholder="Password"
                 autoComplete="current-password"
                 disabled={loading !== null}
-                className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
+                className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500"
               />
               <Button
                 type="submit"
                 disabled={loading !== null}
-                className="w-full rounded-lg"
+                className="h-11 w-full rounded-lg text-base"
               >
                 {loading === "credentials" ? "Signing in..." : "Continue with Email"}
               </Button>
             </div>
           </form>
 
-          {errorMessage && (
+          {infoMessage && (
+            <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-900/30">
+              <p className="text-sm text-emerald-800 dark:text-emerald-300">{infoMessage}</p>
+            </div>
+          )}
+
+          {(errorMessage || formError) && (
             <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30">
-              <p className="text-sm text-red-800 dark:text-red-300">{errorMessage}</p>
+              <p className="text-sm text-red-800 dark:text-red-300">{formError || errorMessage}</p>
+            </div>
+          )}
+
+          {(verifyEmail || verified === "invalid") && (
+            <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
+              <p className="text-sm text-slate-700 dark:text-slate-200">
+                Need another confirmation email?
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={resendVerification}
+                disabled={resendLoading}
+                className="mt-3 h-11 w-full text-base"
+              >
+                {resendLoading ? "Sending..." : "Resend verification email"}
+              </Button>
+              {resendMessage ? (
+                <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">{resendMessage}</p>
+              ) : null}
             </div>
           )}
 
@@ -156,7 +235,7 @@ function SignInForm() {
             <button
               onClick={() => handleSignIn("google")}
               disabled={loading !== null}
-              className="hover-rise flex w-full cursor-pointer items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none"
+              className="hover-rise flex h-11 w-full cursor-pointer items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-base font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -195,7 +274,7 @@ function SignInForm() {
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-white text-slate-700 dark:bg-slate-950 dark:text-slate-200">Loading...</div>}>
+    <Suspense fallback={<PageLoadingSkeleton variant="auth" />}>
       <SignInForm />
     </Suspense>
   );

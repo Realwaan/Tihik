@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, RefreshCcw, Trash2, Users } from "lucide-react";
+import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { Button } from "@/components/ui/button";
 import { CategoryCombobox } from "@/components/ui/category-combobox";
@@ -211,12 +212,15 @@ export function CollaborationManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: householdName.trim() }),
       });
-      if (!response.ok) throw new Error("Failed");
+      if (!response.ok) {
+        const json = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error || "Failed");
+      }
       setHouseholdName("");
       await loadHouseholds();
       showToast("success", "Household created.");
-    } catch {
-      showToast("error", "Failed to create household.");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Failed to create household.");
     } finally {
       setCreatingHousehold(false);
     }
@@ -251,12 +255,15 @@ export function CollaborationManager() {
           email: inviteEmail.trim(),
         }),
       });
-      if (!response.ok) throw new Error("Failed");
+      if (!response.ok) {
+        const json = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error || "Failed");
+      }
       setInviteEmail("");
       await loadHouseholds();
       showToast("success", "Member invited.");
-    } catch {
-      showToast("error", "Failed to invite member.");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Failed to invite member.");
     } finally {
       setInviting(false);
     }
@@ -319,7 +326,10 @@ export function CollaborationManager() {
           date: expenseForm.date,
         }),
       });
-      if (!response.ok) throw new Error("Failed");
+      if (!response.ok) {
+        const json = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(json?.error || "Failed");
+      }
 
         setExpenseForm({
           amount: "",
@@ -330,8 +340,8 @@ export function CollaborationManager() {
         });
       await loadExpenses(selectedHouseholdId);
       showToast("success", "Shared expense added.");
-    } catch {
-      showToast("error", "Failed to add shared expense.");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Failed to add shared expense.");
     } finally {
       setAddingExpense(false);
     }
@@ -357,8 +367,8 @@ export function CollaborationManager() {
   }
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[0.95fr_1.05fr]">
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+    <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
           Collaboration groups
         </h2>
@@ -389,7 +399,12 @@ export function CollaborationManager() {
 
         <div className="mt-6">
           {loading ? (
-            <div className="h-24 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-700" />
+            <Skeleton
+              variant="rounded"
+              animation="wave"
+              height={96}
+              className="rounded-2xl"
+            />
           ) : households.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
               No households yet.
@@ -455,7 +470,7 @@ export function CollaborationManager() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-amber-600" />
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">

@@ -6,11 +6,15 @@
   :root {
     color-scheme: light;
     background-color: #ffffff;
+    -webkit-tap-highlight-color: transparent;
   }
 
   html {
     background-color: #ffffff;
     scroll-behavior: smooth;
+    min-height: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   html.dark {
@@ -20,7 +24,9 @@
 
   body {
     @apply bg-white text-slate-900 antialiased;
-    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
     background-image:
       radial-gradient(circle at top left, rgba(56, 189, 248, 0.08), transparent 34%),
       radial-gradient(circle at top right, rgba(251, 191, 36, 0.08), transparent 30%),
@@ -29,6 +35,7 @@
 
   html.dark body {
     @apply bg-slate-950 text-slate-100;
+    min-height: 100dvh;
     background-image:
       radial-gradient(circle at top left, rgba(251, 191, 36, 0.12), transparent 30%),
       radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 28%),
@@ -41,9 +48,18 @@
 }
 
 @layer components {
+  .page-transition-shell {
+    animation: page-enter 180ms ease-out both;
+    will-change: transform, opacity;
+  }
+
   .page-shell {
     position: relative;
     isolation: isolate;
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
   }
 
   .page-shell::before {
@@ -94,7 +110,20 @@
   }
 }
 
+@keyframes page-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .page-transition-shell {
+    animation: none;
+  }
+
   html {
     scroll-behavior: auto;
   }
