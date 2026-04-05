@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
+import { writeCollaborationAuditEvent } from "@/lib/collaboration-audit";
 import { isUserEmailVerified, userHasHouseholdAccess } from "@/lib/collaboration";
 import { prisma } from "@/lib/prisma";
 import { sharedExpenseUpdateSchema } from "@/lib/validations/collaboration";
@@ -29,7 +30,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     const existing = await prisma.sharedExpense.findUnique({
       where: { id },
-      select: { id: true, householdId: true },
+      select: { id: true, householdId: true, paidByUserId: true },
     });
 
     if (!existing) {
@@ -42,6 +43,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     );
     if (!access) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const canModify = access.role === "OWNER" || existing.paidByUserId === session.user.id;
+    if (!canModify) {
+      return NextResponse.json(
+        { error: "Only household owner or expense creator can edit this expense" },
+        { status: 403 }
+      );
     }
 
     const json = await request.json().catch(() => null);
@@ -74,6 +83,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       },
     });
 
+    await writeCollaborationAuditEvent({
+      householdId: existing.householdId,
+      actorUserId: session.user.id,
+      action: "EXPENSE_UPDATED",
+      entityType: "SharedExpense",
+      entityId: updated.id,
+      details: `Updated expense category ${updated.category}`,
+    });
+
     return NextResponse.json({ data: updated }, { status: 200 });
   } catch (error) {
     console.error("Failed to update shared expense", error);
@@ -102,7 +120,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     const existing = await prisma.sharedExpense.findUnique({
       where: { id },
-      select: { id: true, householdId: true },
+      select: { id: true, householdId: true, paidByUserId: true },
     });
 
     if (!existing) {
@@ -117,8 +135,25 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const canDelete = access.role === "OWNER" || existing.paidByUserId === session.user.id;
+    if (!canDelete) {
+      return NextResponse.json(
+        { error: "Only household owner or expense creator can delete this expense" },
+        { status: 403 }
+      );
+    }
+
     await prisma.sharedExpense.delete({
       where: { id },
+    });
+
+    await writeCollaborationAuditEvent({
+      householdId: existing.householdId,
+      actorUserId: session.user.id,
+      action: "EXPENSE_DELETED",
+      entityType: "SharedExpense",
+      entityId: existing.id,
+      details: "Deleted shared expense",
     });
 
     return NextResponse.json({ success: true }, { status: 200 });

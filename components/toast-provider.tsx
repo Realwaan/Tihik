@@ -1,7 +1,9 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from "react";
 import { CheckCircle, XCircle, Info, AlertCircle, X } from "lucide-react";
+
+import { triggerHaptic } from "@/lib/haptics";
 
 type ToastType = "success" | "error" | "info" | "warning";
 
@@ -9,6 +11,7 @@ interface Toast {
   id: string;
   type: ToastType;
   message: string;
+  durationMs: number;
 }
 
 interface ToastContextType {
@@ -22,12 +25,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const showToast = useCallback((type: ToastType, message: string) => {
     const id = Math.random().toString(36).substring(7);
-    setToasts((prev) => [...prev, { id, type, message }]);
-
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 5000);
+    const durationMs = type === "success" ? 3400 : type === "info" ? 4200 : 5000;
+    setToasts((prev) => [...prev, { id, type, message, durationMs }]);
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -37,7 +36,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="pointer-events-none fixed bottom-0 right-0 z-50 flex flex-col gap-3 p-6">
+      <div className="pointer-events-none fixed bottom-0 right-0 z-50 flex w-full max-w-md flex-col gap-3 p-4 sm:p-6">
         {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
         ))}
@@ -53,6 +52,24 @@ function ToastItem({
   toast: Toast;
   onRemove: (id: string) => void;
 }) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setVisible(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    const hideTimer = window.setTimeout(() => setVisible(false), toast.durationMs);
+    return () => window.clearTimeout(hideTimer);
+  }, [toast.durationMs]);
+
+  useEffect(() => {
+    if (visible) return;
+    const removeTimer = window.setTimeout(() => onRemove(toast.id), 240);
+    return () => window.clearTimeout(removeTimer);
+  }, [visible, onRemove, toast.id]);
+
   const icons = {
     success: CheckCircle,
     error: XCircle,
@@ -78,17 +95,31 @@ function ToastItem({
 
   return (
     <div
-      className={`pointer-events-auto flex min-w-[320px] items-start gap-3 rounded-lg border p-4 shadow-lg transition-all duration-300 animate-in slide-in-from-right ${styles[toast.type]}`}
+      className={`pointer-events-auto relative overflow-hidden rounded-2xl border p-4 shadow-lg backdrop-blur transition-all duration-200 ease-out ${styles[toast.type]} ${
+        visible ? "translate-x-0 opacity-100" : "translate-x-3 opacity-0"
+      }`}
     >
-      <Icon className={`h-5 w-5 flex-shrink-0 ${iconStyles[toast.type]}`} />
-      <p className="flex-1 text-sm font-medium">{toast.message}</p>
-      <button
-        onClick={() => onRemove(toast.id)}
-        className="flex-shrink-0 cursor-pointer rounded-full p-1 transition-colors hover:bg-black/5"
-        aria-label="Close notification"
-      >
-        <X className="h-4 w-4" />
-      </button>
+      <div className="flex items-start gap-3">
+        <Icon className={`h-5 w-5 flex-shrink-0 ${iconStyles[toast.type]}`} />
+        <p className="flex-1 text-sm font-medium leading-relaxed">{toast.message}</p>
+        <button
+          onClick={() => {
+            triggerHaptic("light");
+            setVisible(false);
+          }}
+          className="flex-shrink-0 cursor-pointer rounded-full p-1 transition-colors hover:bg-black/5"
+          aria-label="Close notification"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-1 origin-left bg-black/10 dark:bg-white/10"
+        style={{
+          transform: visible ? "scaleX(0)" : "scaleX(1)",
+          transition: `transform ${toast.durationMs}ms linear`,
+        }}
+      />
     </div>
   );
 }

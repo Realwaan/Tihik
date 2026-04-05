@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
+import { writeCollaborationAuditEvent } from "@/lib/collaboration-audit";
 import { isUserEmailVerified } from "@/lib/collaboration";
 import { prisma } from "@/lib/prisma";
 
@@ -42,6 +43,15 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
         { status: 403 }
       );
     }
+
+    await writeCollaborationAuditEvent({
+      householdId: household.id,
+      actorUserId: session.user.id,
+      action: "HOUSEHOLD_DELETED",
+      entityType: "Household",
+      entityId: household.id,
+      details: "Deleted household",
+    });
 
     await prisma.household.delete({
       where: { id },

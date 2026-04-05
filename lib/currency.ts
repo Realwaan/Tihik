@@ -25,6 +25,10 @@ export function convertToUSD(amount: number, currency: Currency): number {
   return amount * rate;
 }
 
+export function getUsdRate(currency: Currency): number {
+  return USD_RATES[currency];
+}
+
 export function convertFromUSD(amount: number, currency: Currency): number {
   const rate = USD_RATES[currency];
   return amount / rate;
@@ -42,6 +46,36 @@ export function convertCurrency(
   const usdAmount = convertToUSD(amount, fromCurrency);
   const converted = convertFromUSD(usdAmount, toCurrency);
   return roundForCurrency(converted, toCurrency);
+}
+
+export function convertCurrencyWithRateLock(
+  amount: number,
+  fromCurrency: Currency,
+  toCurrency: Currency,
+  options?: { lockedUsdRate?: number }
+): {
+  amount: number;
+  rateUsed: number;
+  lockedRate: boolean;
+} {
+  if (fromCurrency === toCurrency) {
+    return {
+      amount,
+      rateUsed: 1,
+      lockedRate: Boolean(options?.lockedUsdRate),
+    };
+  }
+
+  const effectiveFromRate = options?.lockedUsdRate ?? getUsdRate(fromCurrency);
+  const toRate = getUsdRate(toCurrency);
+  const usdAmount = amount * effectiveFromRate;
+  const converted = usdAmount / toRate;
+
+  return {
+    amount: roundForCurrency(converted, toCurrency),
+    rateUsed: effectiveFromRate / toRate,
+    lockedRate: Boolean(options?.lockedUsdRate),
+  };
 }
 
 export function roundForCurrency(amount: number, currency: Currency): number {

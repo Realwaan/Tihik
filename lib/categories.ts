@@ -1,3 +1,31 @@
+export const PH_LOCAL_WALLET_CATEGORIES = [
+  "GCash",
+  "Maya",
+  "GoTyme",
+  "GrabPay",
+  "ShopeePay",
+  "Coins.ph",
+  "PalawanPay",
+  "DiskarTech",
+] as const;
+
+export const PH_BANK_WALLET_CATEGORIES = [
+  "BPI",
+  "BDO",
+  "UnionBank",
+  "Landbank",
+  "Metrobank",
+  "RCBC",
+  "Security Bank",
+  "PNB",
+  "Chinabank",
+  "EastWest",
+  "SeaBank",
+  "Tonik",
+  "UNO Bank",
+  "KOMO",
+] as const;
+
 export const PREMADE_EXPENSE_CATEGORIES = [
   "Food",
   "Groceries",
@@ -14,6 +42,8 @@ export const PREMADE_EXPENSE_CATEGORIES = [
   "Shopping",
   "Travel",
   "Subscription",
+  ...PH_LOCAL_WALLET_CATEGORIES,
+  ...PH_BANK_WALLET_CATEGORIES,
 ] as const;
 
 export const PREMADE_INCOME_CATEGORIES = [
@@ -25,6 +55,8 @@ export const PREMADE_INCOME_CATEGORIES = [
   "Refund",
   "Interest",
   "Other Income",
+  ...PH_LOCAL_WALLET_CATEGORIES,
+  ...PH_BANK_WALLET_CATEGORIES,
 ] as const;
 
 export const PREMADE_CATEGORIES = Array.from(

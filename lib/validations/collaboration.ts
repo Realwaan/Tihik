@@ -30,3 +30,19 @@ export const sharedExpenseUpdateSchema = sharedExpenseCreateSchema
     date: true,
   })
   .partial();
+
+export const settlementPaymentCreateSchema = z.object({
+  householdId: z.string().min(1),
+  fromUserId: z.string().min(1),
+  toUserId: z.string().min(1),
+  amountUsd: z.coerce
+    .number({ invalid_type_error: "Amount must be a number" })
+    .finite("Amount must be valid")
+    .positive("Amount must be greater than 0"),
+  dueDate: z.coerce.date({ invalid_type_error: "Due date must be valid" }),
+  note: z.string().trim().max(300).optional().nullable(),
+});
+
+export const settlementPaymentActionSchema = z.object({
+  action: z.enum(["SEND_REMINDER", "MARK_PAID", "MARK_PENDING"]),
+});

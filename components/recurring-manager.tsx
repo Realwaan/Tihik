@@ -5,6 +5,7 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { CategoryCombobox } from "@/components/ui/category-combobox";
+import { WalletCategoryBadge } from "@/components/ui/wallet-category-badge";
 import { mergeCategories } from "@/lib/categories";
 
 type RecurringTemplate = {
@@ -100,6 +101,13 @@ export function RecurringManager() {
       )
     );
   }, [templates, form.type]);
+
+  const missedTemplatesCount = templates.filter((template) => {
+    if (!template.isActive) return false;
+    const nextRun = new Date(template.nextRunDate);
+    const today = new Date();
+    return nextRun < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  }).length;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -208,6 +216,11 @@ export function RecurringManager() {
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Automate repeated expenses and income.
         </p>
+        {missedTemplatesCount > 0 ? (
+          <p className="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+            {missedTemplatesCount} recurring template{missedTemplatesCount === 1 ? "" : "s"} missed schedule and will be auto-caught up on refresh.
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
@@ -384,6 +397,7 @@ export function RecurringManager() {
                         <p className="font-medium text-slate-900 dark:text-slate-100">
                           {template.category}
                         </p>
+                        <WalletCategoryBadge category={template.category} />
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                             template.type === "INCOME"
@@ -400,6 +414,13 @@ export function RecurringManager() {
                         {template.interval > 1 ? "s" : ""} • Next{" "}
                         {new Date(template.nextRunDate).toLocaleDateString()}
                       </p>
+                      {template.isActive &&
+                      new Date(template.nextRunDate) <
+                        new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()) ? (
+                        <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                          Missed schedule detected. Catch-up will run automatically.
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-2">
                       <button

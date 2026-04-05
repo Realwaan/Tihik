@@ -1,8 +1,8 @@
 "use client";
 
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, PieChart, RefreshCcw, Wallet, Target, Users, User, Bell } from "lucide-react";
+import { ArrowUpRight, PieChart, RefreshCcw, Wallet, Target, Users, User, Bell, Landmark, Smartphone, CreditCard } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -16,11 +16,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import Skeleton from "@mui/material/Skeleton";
+import MuiSkeleton from "@mui/material/Skeleton";
 
 import { SignOutButton } from "@/components/auth-buttons";
+import { MobileNavDock } from "@/components/mobile-nav-dock";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { WalletCategoryBadge } from "@/components/ui/wallet-category-badge";
+import { getWalletBadge } from "@/lib/wallet-badges";
 
 type DashboardData = {
   totalIncome: number;
@@ -50,6 +53,38 @@ type DashboardData = {
     expenseChangePercent: number | null;
     incomeChangePercent: number | null;
   };
+  cashflowForecast: Array<{
+    month: string;
+    projectedIncome: number;
+    projectedExpense: number;
+    projectedBalance: number;
+  }>;
+  categoryDrilldown: Array<{
+    month: string;
+    label: string;
+    values: Array<{
+      category: string;
+      amount: number;
+    }>;
+  }>;
+  walletBreakdown: {
+    cashBalance: number;
+    ewalletBalance: number;
+    bankBalance: number;
+    otherBalance: number;
+    ewallets: Array<{
+      category: string;
+      balance: number;
+    }>;
+    banks: Array<{
+      category: string;
+      balance: number;
+    }>;
+    uncategorizedAccounts: Array<{
+      category: string;
+      balance: number;
+    }>;
+  };
 };
 
 type Currency = "USD" | "EUR" | "GBP" | "JPY" | "CAD" | "AUD" | "PHP";
@@ -60,15 +95,42 @@ type NotificationItem = {
     | "SMART_LARGE_EXPENSE"
     | "SMART_CATEGORY_SURGE"
     | "BUDGET_OVER"
-    | "BUDGET_NEAR";
+    | "BUDGET_NEAR"
+    | "COLLAB_SETTLEMENT_REMINDER"
+    | "COLLAB_SETTLEMENT_OVERDUE"
+    | "RECURRING_MISSED_PAYMENT";
   severity: "info" | "warning";
   title: string;
   message: string;
   createdAt: string;
 };
 
+type NotificationPreferences = {
+  budgetNearEnabled: boolean;
+  budgetOverEnabled: boolean;
+  smartSpikeEnabled: boolean;
+  smartLargeExpenseEnabled: boolean;
+  smartCategorySurgeEnabled: boolean;
+};
+
 const palette = ["#f59e0b", "#3b82f6", "#8b5cf6", "#14b8a6", "#ef4444", "#22c55e"];
 const READ_NOTIFICATIONS_STORAGE_KEY = "trackit.notifications.read.v1";
+
+function Skeleton(props: React.ComponentProps<typeof MuiSkeleton>) {
+  const { sx, ...rest } = props;
+  const mergedSx = Array.isArray(sx)
+    ? [{ "&::after": { animationDuration: "1.9s" } }, ...sx]
+    : sx
+      ? [{ "&::after": { animationDuration: "1.9s" } }, sx]
+      : { "&::after": { animationDuration: "1.9s" } };
+
+  return (
+    <MuiSkeleton
+      {...rest}
+      sx={mergedSx}
+    />
+  );
+}
 
 export function DashboardDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -77,8 +139,14 @@ export function DashboardDashboard() {
   const [preferredCurrency, setPreferredCurrency] = useState<Currency>("USD");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationPreferences, setNotificationPreferences] =
+    useState<NotificationPreferences | null>(null);
+  const [loadingPreferences, setLoadingPreferences] = useState(false);
+  const [savingPreferenceKey, setSavingPreferenceKey] = useState<keyof NotificationPreferences | null>(null);
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(new Set());
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [accountView, setAccountView] = useState<"ALL" | "DEBIT" | "CREDIT">("ALL");
+  const [accountCardsAnimated, setAccountCardsAnimated] = useState(true);
   const notificationsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -169,8 +237,74 @@ export function DashboardDashboard() {
 
   const chartData = useMemo(() => data?.expensesByCategory ?? [], [data]);
   const trendData = useMemo(() => data?.monthlyTrend ?? [], [data]);
+  const forecastData = useMemo(() => data?.cashflowForecast ?? [], [data]);
+  const drilldownData = useMemo(() => data?.categoryDrilldown ?? [], [data]);
+  const accountCards = useMemo(() => {
+    const cards: Array<{
+      id: string;
+      category: string;
+      group: "cash" | "ewallet" | "bank";
+      balance: number;
+    }> = [];
+
+    const walletBreakdown = data?.walletBreakdown;
+    if (!walletBreakdown) return cards;
+
+    cards.push({
+      id: "cash",
+      category: "Cash",
+      group: "cash",
+      balance: walletBreakdown.cashBalance,
+    });
+
+    walletBreakdown.ewallets.forEach((item) => {
+      cards.push({
+        id: `ewallet-${item.category}`,
+        category: item.category,
+        group: "ewallet",
+        balance: item.balance,
+      });
+    });
+
+    walletBreakdown.banks.forEach((item) => {
+      cards.push({
+        id: `bank-${item.category}`,
+        category: item.category,
+        group: "bank",
+        balance: item.balance,
+      });
+    });
+
+    return cards.sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
+  }, [data]);
+  const filteredAccountCards = useMemo(
+    () =>
+      accountCards.filter((item) => {
+        if (accountView === "ALL") return true;
+        if (accountView === "DEBIT") return item.balance >= 0;
+        return item.balance < 0;
+      }),
+    [accountCards, accountView]
+  );
+  const debitNetWorth = useMemo(
+    () => accountCards.filter((item) => item.balance >= 0).reduce((sum, item) => sum + item.balance, 0),
+    [accountCards]
+  );
   const warningCount = notifications.filter((n) => n.severity === "warning" && !readNotificationIds.has(n.id)).length;
   const unreadCount = notifications.filter((n) => !readNotificationIds.has(n.id)).length;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      setAccountCardsAnimated(true);
+      return;
+    }
+
+    setAccountCardsAnimated(false);
+    const timer = window.setTimeout(() => setAccountCardsAnimated(true), 24);
+    return () => window.clearTimeout(timer);
+  }, [accountView, filteredAccountCards.length]);
 
   async function loadNotifications() {
     try {
@@ -188,11 +322,59 @@ export function DashboardDashboard() {
     }
   }
 
+  async function loadNotificationPreferences() {
+    try {
+      setLoadingPreferences(true);
+      const response = await fetch("/api/notifications/preferences");
+      if (!response.ok) {
+        throw new Error("Failed to fetch preferences");
+      }
+      const json = (await response.json()) as { data?: NotificationPreferences };
+      if (json.data) {
+        setNotificationPreferences(json.data);
+      }
+    } catch {
+      setNotificationPreferences(null);
+    } finally {
+      setLoadingPreferences(false);
+    }
+  }
+
+  async function updateNotificationPreference(
+    key: keyof NotificationPreferences,
+    value: boolean
+  ) {
+    const previous = notificationPreferences;
+    setSavingPreferenceKey(key);
+    setNotificationPreferences((current) =>
+      current ? { ...current, [key]: value } : current
+    );
+
+    try {
+      const response = await fetch("/api/notifications/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update preference");
+      }
+
+      await loadNotifications();
+    } catch {
+      setNotificationPreferences(previous);
+    } finally {
+      setSavingPreferenceKey(null);
+    }
+  }
+
   function toggleNotifications() {
     const nextState = !notificationsOpen;
     setNotificationsOpen(nextState);
     if (nextState) {
       loadNotifications();
+      loadNotificationPreferences();
     }
   }
 
@@ -216,8 +398,8 @@ export function DashboardDashboard() {
   }
 
   return (
-    <main className="page-shell min-h-screen bg-white text-slate-900 dark:bg-gradient-to-b dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-slate-100">
-      <div className="reveal border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+    <main className="page-shell min-h-screen bg-white pb-32 text-slate-900 dark:bg-gradient-to-b dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-slate-100">
+      <div className="reveal relative z-40 overflow-visible border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-10">
           <div>
             <p className="text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-amber-600 dark:text-amber-400 sm:text-xs">TrackIt</p>
@@ -248,7 +430,7 @@ export function DashboardDashboard() {
                 Profile
               </Button>
             </a>
-            <div className="relative col-span-2 w-full sm:col-span-1 sm:w-auto" ref={notificationsRef}>
+            <div className="relative z-50 col-span-2 w-full sm:col-span-1 sm:w-auto" ref={notificationsRef}>
               <button
                 type="button"
                 onClick={toggleNotifications}
@@ -264,7 +446,14 @@ export function DashboardDashboard() {
               </button>
 
               {notificationsOpen ? (
-                <div className="absolute right-0 z-30 mt-2 w-[calc(100vw-1.5rem)] max-w-[360px] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:w-[360px]">
+                <>
+                <button
+                  type="button"
+                  aria-label="Close notifications"
+                  onClick={() => setNotificationsOpen(false)}
+                  className="fixed inset-0 z-40 bg-slate-900/30 sm:hidden"
+                />
+                <div className="fixed left-3 top-24 z-[90] max-h-[70vh] w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:z-[90] sm:mt-2 sm:max-h-none sm:w-[360px]">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                       Notifications ({unreadCount} unread)
@@ -280,12 +469,70 @@ export function DashboardDashboard() {
                       </button>
                       <button
                         type="button"
-                        onClick={loadNotifications}
+                        onClick={() => {
+                          loadNotifications();
+                          loadNotificationPreferences();
+                        }}
                         className="text-xs text-slate-500 transition-colors duration-200 ease-out hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                       >
                         Refresh
                       </button>
                     </div>
+                  </div>
+                  <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 dark:border-slate-700 dark:bg-slate-950/50">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Alert settings
+                    </p>
+                    {loadingPreferences ? (
+                      <Skeleton variant="rounded" animation="wave" height={72} className="rounded-lg" />
+                    ) : notificationPreferences ? (
+                      <div className="space-y-1">
+                        <PreferenceToggle
+                          label="Near budget"
+                          checked={notificationPreferences.budgetNearEnabled}
+                          disabled={savingPreferenceKey === "budgetNearEnabled"}
+                          onChange={(checked) =>
+                            updateNotificationPreference("budgetNearEnabled", checked)
+                          }
+                        />
+                        <PreferenceToggle
+                          label="Over budget"
+                          checked={notificationPreferences.budgetOverEnabled}
+                          disabled={savingPreferenceKey === "budgetOverEnabled"}
+                          onChange={(checked) =>
+                            updateNotificationPreference("budgetOverEnabled", checked)
+                          }
+                        />
+                        <PreferenceToggle
+                          label="Monthly spike"
+                          checked={notificationPreferences.smartSpikeEnabled}
+                          disabled={savingPreferenceKey === "smartSpikeEnabled"}
+                          onChange={(checked) =>
+                            updateNotificationPreference("smartSpikeEnabled", checked)
+                          }
+                        />
+                        <PreferenceToggle
+                          label="Large expense"
+                          checked={notificationPreferences.smartLargeExpenseEnabled}
+                          disabled={savingPreferenceKey === "smartLargeExpenseEnabled"}
+                          onChange={(checked) =>
+                            updateNotificationPreference("smartLargeExpenseEnabled", checked)
+                          }
+                        />
+                        <PreferenceToggle
+                          label="Category surge"
+                          checked={notificationPreferences.smartCategorySurgeEnabled}
+                          disabled={savingPreferenceKey === "smartCategorySurgeEnabled"}
+                          onChange={(checked) =>
+                            updateNotificationPreference("smartCategorySurgeEnabled", checked)
+                          }
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Unable to load preferences right now.
+                      </p>
+                    )}
                   </div>
                   <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
                     {loadingNotifications ? (
@@ -351,6 +598,7 @@ export function DashboardDashboard() {
                     Open transactions dashboard
                   </a>
                 </div>
+                </>
               ) : null}
             </div>
             <SignOutButton />
@@ -360,17 +608,108 @@ export function DashboardDashboard() {
 
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
         {loading ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <Skeleton
-                key={index}
-                variant="rounded"
-                animation="wave"
-                height={104}
-                className="rounded-3xl"
-              />
-            ))}
-          </div>
+          <>
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <Skeleton
+                  key={`metric-${index}`}
+                  variant="rounded"
+                  animation="wave"
+                  height={104}
+                  className="rounded-3xl"
+                />
+              ))}
+            </section>
+
+            <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] sm:mt-8">
+              <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+                <Skeleton variant="text" animation="wave" width={180} height={34} />
+                <Skeleton variant="text" animation="wave" width={300} height={24} />
+                <Skeleton variant="rounded" animation="wave" height={290} className="mt-5 rounded-2xl" />
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+                <Skeleton variant="text" animation="wave" width={120} height={34} />
+                <div className="mt-4 space-y-3">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <Skeleton
+                      key={`quick-stat-${index}`}
+                      variant="rounded"
+                      animation="wave"
+                      height={46}
+                      className="rounded-2xl"
+                    />
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="mt-6">
+              <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <Skeleton variant="text" animation="wave" width={150} height={34} />
+                    <Skeleton variant="text" animation="wave" width={330} height={24} />
+                  </div>
+                  <Skeleton variant="rounded" animation="wave" width={150} height={40} className="rounded-full" />
+                </div>
+                <div className="mt-4 space-y-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <Skeleton
+                      key={`budget-alert-${index}`}
+                      variant="rounded"
+                      animation="wave"
+                      height={74}
+                      className="rounded-2xl"
+                    />
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+                <Skeleton variant="text" animation="wave" width={140} height={34} />
+                <Skeleton variant="text" animation="wave" width={280} height={24} />
+                <Skeleton variant="rounded" animation="wave" height={270} className="mt-5 rounded-2xl" />
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+                <Skeleton variant="text" animation="wave" width={100} height={34} />
+                <div className="mt-4 space-y-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <Skeleton
+                      key={`insight-${index}`}
+                      variant="rounded"
+                      animation="wave"
+                      height={48}
+                      className="rounded-2xl"
+                    />
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
+              <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+                <Skeleton variant="text" animation="wave" width={170} height={34} />
+                <Skeleton variant="text" animation="wave" width={320} height={24} />
+                <div className="mt-4 space-y-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <Skeleton
+                      key={`forecast-${index}`}
+                      variant="rounded"
+                      animation="wave"
+                      height={60}
+                      className="rounded-2xl"
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6">
+                <Skeleton variant="text" animation="wave" width={190} height={34} />
+                <Skeleton variant="rounded" animation="wave" height={220} className="mt-4 rounded-2xl" />
+              </div>
+            </section>
+          </>
         ) : error ? (
           <div className="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-rose-700">{error}</div>
         ) : (
@@ -379,6 +718,120 @@ export function DashboardDashboard() {
               <MetricCard label="Current balance" value={formatCurrency(data?.currentBalance ?? 0, preferredCurrency)} icon={Wallet} accent="amber" />
               <MetricCard label="Total income" value={formatCurrency(data?.totalIncome ?? 0, preferredCurrency)} icon={ArrowUpRight} accent="emerald" />
               <MetricCard label="Total expenses" value={formatCurrency(data?.totalExpenses ?? 0, preferredCurrency)} icon={PieChart} accent="rose" />
+            </section>
+
+            <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40 sm:p-6">
+              <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Accounts</h2>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage your wallets and balances</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/60">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Net worth</p>
+                  <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{formatCurrency(debitNetWorth, preferredCurrency)}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Debit balances only</p>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(["ALL", "DEBIT", "CREDIT"] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setAccountView(filter)}
+                    className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                      accountView === filter
+                        ? "border-emerald-500 bg-emerald-100/70 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/35 dark:text-emerald-200"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    {filter === "ALL" ? "All" : filter === "DEBIT" ? "Debit" : "Credit"}
+                  </button>
+                ))}
+              </div>
+
+              {(data?.walletBreakdown?.uncategorizedAccounts ?? []).length > 0 ? (
+                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-800/60 dark:bg-amber-900/20">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+                    Fix uncategorized accounts
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700/90 dark:text-amber-200/90">
+                    These categories are currently counted under Other. Rename them to wallet or bank categories for accurate separation.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(data?.walletBreakdown?.uncategorizedAccounts ?? []).map((item) => (
+                      <span
+                        key={`uncategorized-${item.category}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-amber-300/70 bg-white/70 px-2.5 py-1 text-xs font-medium text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/20 dark:text-amber-200"
+                      >
+                        <span>{item.category}</span>
+                        <span>{formatCurrency(item.balance, preferredCurrency)}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {filteredAccountCards.length === 0 ? (
+                  <div className="sm:col-span-2 rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                    No account balances for this filter yet.
+                  </div>
+                ) : (
+                  filteredAccountCards.map((account) => {
+                    const badge = getWalletBadge(account.category);
+                    const tone =
+                      account.group === "cash"
+                        ? "border-amber-200/70 bg-amber-50/70 dark:border-amber-800/60 dark:bg-amber-900/20"
+                        : account.group === "ewallet"
+                          ? "border-sky-200/70 bg-sky-50/70 dark:border-sky-800/60 dark:bg-sky-900/20"
+                          : "border-indigo-200/70 bg-indigo-50/70 dark:border-indigo-800/60 dark:bg-indigo-900/20";
+                    const Icon =
+                      account.group === "cash"
+                        ? Wallet
+                        : account.group === "ewallet"
+                          ? Smartphone
+                          : Landmark;
+
+                    return (
+                      <article
+                        key={account.id}
+                        className={`relative overflow-hidden rounded-3xl border p-4 transition-all duration-300 ease-out ${tone} ${
+                          accountCardsAnimated
+                            ? "translate-y-0 scale-100 opacity-100"
+                            : "translate-y-2 scale-[0.98] opacity-0"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">{account.category}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                              {account.balance >= 0 ? "Debit" : "Credit"} • {preferredCurrency}
+                            </p>
+                          </div>
+                          {account.group === "cash" ? (
+                            <span className="rounded-full border border-amber-200/80 bg-amber-100/70 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-800 dark:border-amber-800/60 dark:bg-amber-900/25 dark:text-amber-200">CASH</span>
+                          ) : (
+                            <WalletCategoryBadge category={account.category} />
+                          )}
+                        </div>
+                        <div className="mt-8">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Balance</p>
+                          <p className="mt-1 text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                            {formatCurrency(account.balance, preferredCurrency)}
+                          </p>
+                        </div>
+                        <Icon className="pointer-events-none absolute bottom-3 right-3 h-14 w-14 text-slate-300/35 dark:text-slate-200/20" />
+                        {badge ? (
+                          <span className="pointer-events-none absolute left-4 top-4 text-3xl font-black tracking-tight text-slate-300/30 dark:text-slate-200/15">
+                            {badge.code}
+                          </span>
+                        ) : null}
+                      </article>
+                    );
+                  })
+                )}
+              </div>
             </section>
 
             <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] sm:mt-8">
@@ -427,7 +880,19 @@ export function DashboardDashboard() {
               <Card className="rounded-3xl p-4 dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40 sm:p-6">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Quick stats</h2>
                 <div className="mt-5 space-y-4">
-                  <StatRow label="Top category" value={data?.expensesByCategory[0]?.category ?? "None yet"} />
+                  <StatRow
+                    label="Top category"
+                    value={
+                      data?.expensesByCategory[0]?.category ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span>{data.expensesByCategory[0].category}</span>
+                          <WalletCategoryBadge category={data.expensesByCategory[0].category} />
+                        </span>
+                      ) : (
+                        "None yet"
+                      )
+                    }
+                  />
                   <StatRow label="Tracked categories" value={String(data?.expensesByCategory.length ?? 0)} />
                   <StatRow label="Net position" value={formatCurrency((data?.totalIncome ?? 0) - (data?.totalExpenses ?? 0), preferredCurrency)} />
                   <StatRow label="Over budget" value={String(data?.overBudgetCount ?? 0)} />
@@ -469,13 +934,16 @@ export function DashboardDashboard() {
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p
-                              className={`font-medium ${
-                                isOver ? "text-rose-800" : "text-amber-800"
-                              }`}
-                            >
-                              {item.category}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p
+                                className={`font-medium ${
+                                  isOver ? "text-rose-800" : "text-amber-800"
+                                }`}
+                              >
+                                {item.category}
+                              </p>
+                              <WalletCategoryBadge category={item.category} />
+                            </div>
                             <p
                               className={`text-sm ${
                                 isOver ? "text-rose-700" : "text-amber-700"
@@ -591,9 +1059,81 @@ export function DashboardDashboard() {
                 </div>
               </aside>
             </section>
+
+            <section className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
+              <article className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40 sm:p-6">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Cashflow forecast
+                </h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Projected next 3 months using recent trend and recurring templates.
+                </p>
+
+                <div className="mt-4 space-y-3">
+                  {forecastData.map((item) => (
+                    <div
+                      key={item.month}
+                      className="rounded-2xl border border-slate-200 px-4 py-3 dark:border-slate-700"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{item.month}</p>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                            item.projectedBalance >= 0
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                              : "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
+                          }`}
+                        >
+                          {formatCurrency(item.projectedBalance, preferredCurrency)}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Income {formatCurrency(item.projectedIncome, preferredCurrency)} • Expense {formatCurrency(item.projectedExpense, preferredCurrency)}
+                      </p>
+                    </div>
+                  ))}
+                  {forecastData.length === 0 ? (
+                    <p className="text-sm text-slate-500 dark:text-slate-400">No forecast data yet.</p>
+                  ) : null}
+                </div>
+              </article>
+
+              <article className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40 sm:p-6">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Category drilldown
+                </h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Top categories across recent months.
+                </p>
+
+                <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
+                  {drilldownData.map((month) => (
+                    <div key={month.month} className="rounded-2xl border border-slate-200 px-3 py-2 dark:border-slate-700">
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{month.label}</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {month.values.map((item) => (
+                          <span
+                            key={`${month.month}-${item.category}`}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                          >
+                            <span>{item.category}</span>
+                            <WalletCategoryBadge category={item.category} />
+                            <span>{formatCompactCurrency(item.amount, preferredCurrency)}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {drilldownData.length === 0 ? (
+                    <p className="text-sm text-slate-500 dark:text-slate-400">No category drilldown data yet.</p>
+                  ) : null}
+                </div>
+              </article>
+            </section>
           </>
         )}
       </div>
+      <MobileNavDock />
     </main>
   );
 }
@@ -628,7 +1168,32 @@ function MetricCard({
   );
 }
 
-function StatRow({ label, value }: { label: string; value: string }) {
+function PreferenceToggle({
+  label,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-2 rounded-md px-1 py-1 text-xs text-slate-700 dark:text-slate-200">
+      <span>{label}</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500 disabled:opacity-50"
+      />
+    </label>
+  );
+}
+
+function StatRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0 dark:border-slate-700">
       <span className="text-sm text-slate-500 dark:text-slate-400">{label}</span>

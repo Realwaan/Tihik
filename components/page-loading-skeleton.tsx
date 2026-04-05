@@ -16,7 +16,10 @@ function line(width: string | number, height = 18, dark = false) {
       variant="rounded"
       width={width}
       height={height}
-      sx={{ bgcolor: dark ? skeletonTone.dark : skeletonTone.light }}
+      sx={{
+        bgcolor: dark ? skeletonTone.dark : skeletonTone.light,
+        "&::after": { animationDuration: "1.9s" },
+      }}
     />
   );
 }
@@ -27,7 +30,11 @@ function card(height: number, dark = false) {
       animation="wave"
       variant="rounded"
       height={height}
-      sx={{ bgcolor: dark ? skeletonTone.dark : skeletonTone.light, borderRadius: 3 }}
+      sx={{
+        bgcolor: dark ? skeletonTone.dark : skeletonTone.light,
+        borderRadius: 3,
+        "&::after": { animationDuration: "1.9s" },
+      }}
     />
   );
 }
@@ -145,7 +152,11 @@ export function PageLoadingSkeleton({ variant }: PageLoadingSkeletonProps) {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">{card(112)}</section>
+        <section className="grid gap-4 md:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index}>{card(112)}</div>
+          ))}
+        </section>
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           {card(420)}
           {card(420)}

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { convertToUSD } from "@/lib/currency";
 import { prisma } from "@/lib/prisma";
+import { getWalletBadge } from "@/lib/wallet-badges";
 
 const TRANSACTION_TYPE = {
   INCOME: "INCOME",
@@ -21,7 +22,7 @@ export async function GET() {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    const [incomeAgg, expenseAgg, expenseRows, budgets] = await Promise.all([
+    const [incomeAgg, expenseAgg, expenseRows, budgets, walletRows] = await Promise.all([
       prisma.transaction.aggregate({
         where: {
           userId: session.user.id,
@@ -66,6 +67,19 @@ export async function GET() {
         where: {
           userId: session.user.id,
           month: monthStart,
+        },
+      }),
+      prisma.transaction.groupBy({
+        by: ["category", "type"],
+        where: {
+          userId: session.user.id,
+          date: {
+            gte: monthStart,
+            lt: nextMonthStart,
+          },
+        },
+        _sum: {
+          amount: true,
         },
       }),
     ]);
@@ -124,6 +138,64 @@ export async function GET() {
       (item) => item.usagePercent >= 80 && item.usagePercent < 100
     ).length;
 
+    const walletBreakdownMap = new Map<string, number>();
+    const bankBreakdownMap = new Map<string, number>();
+    const uncategorizedMap = new Map<string, number>();
+    let cashBalance = 0;
+    let ewalletBalance = 0;
+    let bankBalance = 0;
+    let otherBalance = 0;
+
+    for (const row of walletRows) {
+      const amount = row._sum.amount ?? 0;
+      if (!amount) continue;
+
+      const direction = row.type === TRANSACTION_TYPE.INCOME ? 1 : -1;
+      const signedAmount = amount * direction;
+      const badge = getWalletBadge(row.category);
+
+      if (badge?.kind === "wallet") {
+        ewalletBalance += signedAmount;
+        walletBreakdownMap.set(
+          row.category,
+          (walletBreakdownMap.get(row.category) ?? 0) + signedAmount
+        );
+        continue;
+      }
+
+      if (badge?.kind === "bank") {
+        bankBalance += signedAmount;
+        bankBreakdownMap.set(
+          row.category,
+          (bankBreakdownMap.get(row.category) ?? 0) + signedAmount
+        );
+        continue;
+      }
+
+      if (row.category.trim().toLowerCase().includes("cash")) {
+        cashBalance += signedAmount;
+      } else {
+        otherBalance += signedAmount;
+        uncategorizedMap.set(
+          row.category,
+          (uncategorizedMap.get(row.category) ?? 0) + signedAmount
+        );
+      }
+    }
+
+    const ewallets = Array.from(walletBreakdownMap.entries())
+      .map(([category, balance]) => ({ category, balance }))
+      .sort((a, b) => b.balance - a.balance);
+
+    const banks = Array.from(bankBreakdownMap.entries())
+      .map(([category, balance]) => ({ category, balance }))
+      .sort((a, b) => b.balance - a.balance);
+
+    const uncategorizedAccounts = Array.from(uncategorizedMap.entries())
+      .map(([category, balance]) => ({ category, balance }))
+      .sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance))
+      .slice(0, 6);
+
     const trendMonths = getLastNMonthRanges(6);
     const monthlyTrend = await Promise.all(
       trendMonths.map(async (range) => {
@@ -177,6 +249,112 @@ export async function GET() {
         ? ((currentTrend.income - previousTrend.income) / previousTrend.income) * 100
         : null;
 
+    const avgIncome =
+      monthlyTrend.reduce((sum, item) => sum + item.income, 0) /
+      Math.max(1, monthlyTrend.length);
+    const avgExpense =
+      monthlyTrend.reduce((sum, item) => sum + item.expense, 0) /
+      Math.max(1, monthlyTrend.length);
+
+    const [recurringIncomeTemplates, recurringExpenseTemplates] = await Promise.all([
+      prisma.recurringTransaction.findMany({
+        where: {
+          userId: session.user.id,
+          isActive: true,
+          type: TRANSACTION_TYPE.INCOME,
+        },
+        select: {
+          amount: true,
+          frequency: true,
+          interval: true,
+        },
+      }),
+      prisma.recurringTransaction.findMany({
+        where: {
+          userId: session.user.id,
+          isActive: true,
+          type: TRANSACTION_TYPE.EXPENSE,
+        },
+        select: {
+          amount: true,
+          frequency: true,
+          interval: true,
+        },
+      }),
+    ]);
+
+    const expectedRecurringIncome = recurringIncomeTemplates.reduce(
+      (sum, template) =>
+        sum +
+        estimateMonthlyRecurringAmount(
+          template.amount,
+          template.frequency,
+          template.interval
+        ),
+      0
+    );
+    const expectedRecurringExpense = recurringExpenseTemplates.reduce(
+      (sum, template) =>
+        sum +
+        estimateMonthlyRecurringAmount(
+          template.amount,
+          template.frequency,
+          template.interval
+        ),
+      0
+    );
+
+    const forecast = Array.from({ length: 3 }).map((_, index) => {
+      const targetDate = new Date(now.getFullYear(), now.getMonth() + index + 1, 1);
+      const monthLabel = targetDate.toLocaleDateString("en-US", {
+        month: "short",
+        year: "2-digit",
+      });
+
+      const projectedIncome = Number((avgIncome * 0.55 + expectedRecurringIncome * 0.45).toFixed(2));
+      const projectedExpense = Number((avgExpense * 0.55 + expectedRecurringExpense * 0.45).toFixed(2));
+
+      return {
+        month: monthLabel,
+        projectedIncome,
+        projectedExpense,
+        projectedBalance: Number((projectedIncome - projectedExpense).toFixed(2)),
+      };
+    });
+
+    const topCategories = expensesByCategory.slice(0, 5).map((item) => item.category);
+    const categoryDrilldown = await Promise.all(
+      trendMonths.map(async (range) => {
+        const rows = await prisma.transaction.groupBy({
+          by: ["category"],
+          where: {
+            userId: session.user.id,
+            type: TRANSACTION_TYPE.EXPENSE,
+            date: {
+              gte: range.start,
+              lt: range.end,
+            },
+            category: {
+              in: topCategories,
+            },
+          },
+          _sum: {
+            amount: true,
+          },
+        });
+
+        const valueMap = new Map(rows.map((row) => [row.category, row._sum.amount ?? 0]));
+        return {
+          month: range.key,
+          label: range.label,
+          values: topCategories.map((category) => ({
+            category,
+            amount: valueMap.get(category) ?? 0,
+          })),
+        };
+      })
+    );
+
     return NextResponse.json(
       {
         data: {
@@ -193,6 +371,17 @@ export async function GET() {
             incomeChangePercent,
           },
           totalsByCurrency: totalsByCurrencySummary,
+          cashflowForecast: forecast,
+          categoryDrilldown,
+          walletBreakdown: {
+            cashBalance,
+            ewalletBalance,
+            bankBalance,
+            otherBalance,
+            ewallets,
+            banks,
+            uncategorizedAccounts,
+          },
         },
       },
       { status: 200 }
@@ -204,6 +393,25 @@ export async function GET() {
       { status: 500 }
     );
   }
+}
+
+function estimateMonthlyRecurringAmount(
+  amount: number,
+  frequency: "DAILY" | "WEEKLY" | "MONTHLY",
+  interval: number
+) {
+  if (frequency === "DAILY") {
+    const everyNDays = Math.max(1, interval);
+    return (30 / everyNDays) * amount;
+  }
+
+  if (frequency === "WEEKLY") {
+    const everyNWeeks = Math.max(1, interval);
+    return (4.345 / everyNWeeks) * amount;
+  }
+
+  const everyNMonths = Math.max(1, interval);
+  return amount / everyNMonths;
 }
 
 function getLastNMonthRanges(count: number) {

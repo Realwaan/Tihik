@@ -2,11 +2,13 @@
 
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Plus, Trash2, Download } from "lucide-react";
+import { Loader2, Plus, Trash2, Download, FileUp } from "lucide-react";
 import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { CategoryCombobox } from "@/components/ui/category-combobox";
+import { WalletCategoryBadge } from "@/components/ui/wallet-category-badge";
 import { mergeCategories } from "@/lib/categories";
+import { inferCanonicalWalletCategory } from "@/lib/wallet-normalization";
 import { parseReceiptText } from "@/lib/receipt-parser";
 
 import { transactionCreateSchema } from "@/lib/validations/transaction";
@@ -46,6 +48,8 @@ const initialForm: TransactionFormState = {
   date: new Date().toISOString().slice(0, 10),
 };
 
+const NORMALIZE_HINT_STORAGE_KEY = "trackit.normalize.hint.dismissed.v1";
+
 export function TransactionsManager() {
   const { showToast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -60,6 +64,10 @@ export function TransactionsManager() {
   const [allCategories, setAllCategories] = useState<string[]>([]);
   const [scanningReceipt, setScanningReceipt] = useState(false);
   const [suggestingCategory, setSuggestingCategory] = useState(false);
+  const [importingCsv, setImportingCsv] = useState(false);
+  const [normalizingCategory, setNormalizingCategory] = useState<string | null>(null);
+  const [dismissedNormalizeHint, setDismissedNormalizeHint] = useState(false);
+  const [showNormalizeHint, setShowNormalizeHint] = useState(false);
   const [receiptSource, setReceiptSource] = useState<string | null>(null);
   const [receiptCrop, setReceiptCrop] = useState<ReceiptCrop>({
     x: 0,
@@ -102,6 +110,17 @@ export function TransactionsManager() {
       }
     }
     loadPreference();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(NORMALIZE_HINT_STORAGE_KEY);
+      if (raw === "1") {
+        setDismissedNormalizeHint(true);
+      }
+    } catch {
+      // ignore local storage read failures
+    }
   }, []);
 
   useEffect(() => {
@@ -180,6 +199,50 @@ export function TransactionsManager() {
     }
   }
 
+  async function normalizeCategoryAcrossTransactions(fromCategory: string, toCategory: string) {
+    const targets = transactions.filter(
+      (item) => item.category.trim().toLowerCase() === fromCategory.trim().toLowerCase()
+    );
+
+    if (targets.length === 0) {
+      return;
+    }
+
+    try {
+      setNormalizingCategory(fromCategory);
+
+      await Promise.all(
+        targets.map(async (item) => {
+          const response = await fetch(`/api/transactions/${item.id}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ category: toCategory }),
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed transaction category normalization");
+          }
+        })
+      );
+
+      setTransactions((current) =>
+        current.map((item) =>
+          item.category.trim().toLowerCase() === fromCategory.trim().toLowerCase()
+            ? { ...item, category: toCategory }
+            : item
+        )
+      );
+
+      showToast("success", `Normalized ${targets.length} transaction${targets.length > 1 ? "s" : ""} to ${toCategory}.`);
+    } catch {
+      showToast("error", "Could not normalize category right now.");
+    } finally {
+      setNormalizingCategory(null);
+    }
+  }
+
   function exportToCSV() {
     if (transactions.length === 0) {
       showToast("warning", "No transactions to export");
@@ -214,6 +277,159 @@ export function TransactionsManager() {
     document.body.removeChild(link);
     
     showToast("success", "Transactions exported to CSV!");
+  }
+
+  function exportToPDF() {
+    if (filteredTransactions.length === 0) {
+      showToast("warning", "No transactions to export");
+      return;
+    }
+
+    const rows = filteredTransactions
+      .map(
+        (t) => `
+          <tr>
+            <td>${new Date(t.date).toLocaleDateString()}</td>
+            <td>${t.type}</td>
+            <td>${escapeHtml(t.category)}</td>
+            <td>${escapeHtml(t.note ?? "")}</td>
+            <td style="text-align:right;">${new Intl.NumberFormat("en-US", {
+              style: "currency",
+              currency: t.currency,
+              maximumFractionDigits: t.currency === "JPY" ? 0 : 2,
+            }).format(Number(t.amount))}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const popup = window.open("", "_blank");
+    if (!popup) {
+      showToast("error", "Unable to open print preview. Please allow popups.");
+      return;
+    }
+
+    popup.document.write(`
+      <html>
+        <head>
+          <title>Transactions Export</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
+            h1 { margin: 0 0 12px; }
+            p { margin: 0 0 16px; color: #475569; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px; }
+            th { background: #f8fafc; text-align: left; }
+          </style>
+        </head>
+        <body>
+          <h1>TrackIt Transactions</h1>
+          <p>Generated ${new Date().toLocaleString()}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Category</th>
+                <th>Note</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    popup.document.close();
+    popup.focus();
+    popup.print();
+    popup.close();
+  }
+
+  async function handleCsvImport(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImportingCsv(true);
+      const text = await file.text();
+      const rows = parseCsvRows(text);
+
+      if (rows.length < 2) {
+        showToast("warning", "CSV has no transaction rows.");
+        return;
+      }
+
+      const header = rows[0].map((item) => item.trim().toLowerCase());
+      const importedPayload = rows.slice(1).map((row) => {
+        const get = (name: string) => {
+          const index = header.indexOf(name);
+          return index >= 0 ? row[index] ?? "" : "";
+        };
+
+        const amount = Number(get("amount").replace(/[^0-9.-]/g, ""));
+        const currency = (get("currency") || preferredCurrency).toUpperCase();
+        const type = (get("type") || "EXPENSE").toUpperCase();
+        const category = get("category").trim();
+        const note = get("note").trim();
+        const dateRaw = get("date").trim();
+        const dateValue = new Date(dateRaw);
+        const date = Number.isNaN(dateValue.getTime())
+          ? new Date().toISOString().slice(0, 10)
+          : dateValue.toISOString().slice(0, 10);
+
+        return {
+          amount,
+          currency,
+          type,
+          category,
+          note,
+          date,
+        };
+      });
+
+      const validRows = importedPayload.filter(
+        (row) =>
+          Number.isFinite(row.amount) &&
+          row.amount > 0 &&
+          ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "PHP"].includes(row.currency) &&
+          ["INCOME", "EXPENSE"].includes(row.type) &&
+          row.category.length > 0
+      );
+
+      if (validRows.length === 0) {
+        showToast("warning", "No valid rows found in CSV.");
+        return;
+      }
+
+      await Promise.all(
+        validRows.map((row) =>
+          fetch("/api/transactions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              amount: row.amount,
+              currency: row.currency,
+              type: row.type,
+              category: row.category,
+              note: row.note || undefined,
+              date: row.date,
+            }),
+          })
+        )
+      );
+
+      showToast(
+        "success",
+        `Imported ${validRows.length} transaction${validRows.length === 1 ? "" : "s"} from CSV.`
+      );
+      await loadTransactions();
+    } catch {
+      showToast("error", "CSV import failed. Please verify file format.");
+    } finally {
+      setImportingCsv(false);
+      event.target.value = "";
+    }
   }
 
   async function handleReceiptUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -355,6 +571,31 @@ export function TransactionsManager() {
     
     return matchesSearch && matchesType;
   });
+
+  const hasNormalizationSuggestions = filteredTransactions.some((transaction) => {
+    const canonical = inferCanonicalWalletCategory(transaction.category);
+    return Boolean(
+      canonical && canonical.toLowerCase() !== transaction.category.trim().toLowerCase()
+    );
+  });
+
+  useEffect(() => {
+    if (dismissedNormalizeHint || !hasNormalizationSuggestions) {
+      setShowNormalizeHint(false);
+      return;
+    }
+    setShowNormalizeHint(true);
+  }, [dismissedNormalizeHint, hasNormalizationSuggestions]);
+
+  function dismissNormalizeHint() {
+    setShowNormalizeHint(false);
+    setDismissedNormalizeHint(true);
+    try {
+      window.localStorage.setItem(NORMALIZE_HINT_STORAGE_KEY, "1");
+    } catch {
+      // ignore local storage write failures
+    }
+  }
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
@@ -600,58 +841,99 @@ export function TransactionsManager() {
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Recent transactions</h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Sorted by newest first.</p>
           </div>
-          {transactions.length > 0 && (
-            <button
-              onClick={exportToCSV}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none"
-            >
-              <Download className="h-4 w-4" />
-              Export CSV
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {transactions.length > 0 ? (
+              <>
+                <button
+                  onClick={exportToCSV}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none"
+                >
+                  <Download className="h-4 w-4" />
+                  Export CSV
+                </button>
+                <button
+                  onClick={exportToPDF}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none"
+                >
+                  <Download className="h-4 w-4" />
+                  Export PDF
+                </button>
+              </>
+            ) : null}
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none">
+              <FileUp className="h-4 w-4" />
+              {importingCsv ? "Importing..." : "Import CSV"}
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleCsvImport}
+                disabled={importingCsv}
+                className="hidden"
+              />
+            </label>
+          </div>
         </div>
 
         {/* Search and Filter */}
         {transactions.length > 0 && (
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-            <input
-              type="text"
-              placeholder="Search transactions..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-400"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFilterType("ALL")}
-                className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                  filterType === "ALL"
-                    ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setFilterType("INCOME")}
-                className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                  filterType === "INCOME"
-                    ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                }`}
-              >
-                Income
-              </button>
-              <button
-                onClick={() => setFilterType("EXPENSE")}
-                className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                  filterType === "EXPENSE"
-                    ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                }`}
-              >
-                Expense
-              </button>
+          <div className="mb-6 space-y-3">
+            {showNormalizeHint ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-900/20 dark:text-emerald-200">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p>
+                    Normalize category is available. Use it to quickly standardize wallet and bank labels across matching transactions.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={dismissNormalizeHint}
+                    className="inline-flex items-center justify-center rounded-full border border-emerald-300/80 bg-white/80 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-white dark:border-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-300"
+                  >
+                    Got it
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                type="text"
+                placeholder="Search transactions..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-400"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFilterType("ALL")}
+                  className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                    filterType === "ALL"
+                      ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setFilterType("INCOME")}
+                  className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                    filterType === "INCOME"
+                      ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  Income
+                </button>
+                <button
+                  onClick={() => setFilterType("EXPENSE")}
+                  className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                    filterType === "EXPENSE"
+                      ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  Expense
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -682,11 +964,31 @@ export function TransactionsManager() {
                   <div>
                     <div className="flex items-center gap-3">
                       <p className="font-medium text-slate-900 dark:text-slate-100">{transaction.category}</p>
+                      <WalletCategoryBadge category={transaction.category} />
                       <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${transaction.type === "INCOME" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"}`}>
                         {transaction.type}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{transaction.note || transaction.date.slice(0, 10)}</p>
+                    {(() => {
+                      const canonical = inferCanonicalWalletCategory(transaction.category);
+                      if (!canonical || canonical.toLowerCase() === transaction.category.trim().toLowerCase()) {
+                        return null;
+                      }
+
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => normalizeCategoryAcrossTransactions(transaction.category, canonical)}
+                          disabled={normalizingCategory === transaction.category}
+                          className="mt-1 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50/80 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/45"
+                        >
+                          {normalizingCategory === transaction.category
+                            ? "Normalizing..."
+                            : `Normalize to ${canonical}`}
+                        </button>
+                      );
+                    })()}
                   </div>
                   <div className="flex items-center gap-4">
                     <p className={`text-sm font-semibold ${transaction.type === "INCOME" ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
@@ -742,6 +1044,65 @@ function readFileAsDataUrl(file: File): Promise<string> {
 
 function clampPercent(value: number) {
   return Math.max(0, Math.min(100, value));
+}
+
+function parseCsvRows(input: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < input.length; i += 1) {
+    const char = input[i];
+    if (char === '"') {
+      if (inQuotes && input[i + 1] === '"') {
+        cell += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === "," && !inQuotes) {
+      row.push(cell.trim());
+      cell = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && input[i + 1] === "\n") {
+        i += 1;
+      }
+      row.push(cell.trim());
+      if (row.some((value) => value.length > 0)) {
+        rows.push(row);
+      }
+      row = [];
+      cell = "";
+      continue;
+    }
+
+    cell += char;
+  }
+
+  if (cell.length > 0 || row.length > 0) {
+    row.push(cell.trim());
+    if (row.some((value) => value.length > 0)) {
+      rows.push(row);
+    }
+  }
+
+  return rows;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function getPointerPercent(

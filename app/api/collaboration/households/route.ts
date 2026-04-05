@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
+import { writeCollaborationAuditEvent } from "@/lib/collaboration-audit";
 import { isUserEmailVerified } from "@/lib/collaboration";
 import { prisma } from "@/lib/prisma";
 import { householdCreateSchema } from "@/lib/validations/collaboration";
@@ -99,6 +100,15 @@ export async function POST(request: NextRequest) {
           },
         },
       },
+    });
+
+    await writeCollaborationAuditEvent({
+      householdId: household.id,
+      actorUserId: session.user.id,
+      action: "HOUSEHOLD_CREATED",
+      entityType: "Household",
+      entityId: household.id,
+      details: `Created household ${household.name}`,
     });
 
     return NextResponse.json({ data: household }, { status: 201 });

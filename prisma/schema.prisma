@@ -49,8 +49,22 @@ model User {
   ownedHouseholds     Household[]           @relation("HouseholdOwner")
   householdMemberships HouseholdMember[]
   paidSharedExpenses  SharedExpense[]       @relation("SharedExpensePayer")
+  notificationPreference NotificationPreference?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
+}
+
+model NotificationPreference {
+  id                       String   @id @default(cuid())
+  userId                   String   @unique
+  budgetNearEnabled        Boolean  @default(true)
+  budgetOverEnabled        Boolean  @default(true)
+  smartSpikeEnabled        Boolean  @default(true)
+  smartLargeExpenseEnabled Boolean  @default(true)
+  smartCategorySurgeEnabled Boolean @default(true)
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 }
 
 model Account {

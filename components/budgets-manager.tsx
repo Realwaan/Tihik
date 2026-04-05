@@ -6,6 +6,8 @@ import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { CategoryCombobox } from "@/components/ui/category-combobox";
+import { WalletCategoryBadge } from "@/components/ui/wallet-category-badge";
 import { mergeCategories } from "@/lib/categories";
 
 type BudgetRow = {
@@ -192,20 +194,14 @@ export function BudgetsManager() {
             </Field>
 
             <Field label="Category">
-              <input
-                list="budget-categories"
+              <CategoryCombobox
                 value={form.category}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, category: event.target.value }))
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, category: value }))
                 }
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-amber-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                options={allCategories}
                 placeholder="Food, Rent, Transport..."
               />
-              <datalist id="budget-categories">
-                {allCategories.map((category) => (
-                  <option key={category} value={category} />
-                ))}
-              </datalist>
             </Field>
 
             <Field label="Limit">
@@ -301,9 +297,10 @@ export function BudgetsManager() {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-medium text-slate-900 dark:text-slate-100">
-                          {budget.category}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-900 dark:text-slate-100">{budget.category}</p>
+                          <WalletCategoryBadge category={budget.category} />
+                        </div>
                         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                           {formatCurrency(budget.spent, preferredCurrency)} /{" "}
                           {formatCurrency(budget.limit, preferredCurrency)}
