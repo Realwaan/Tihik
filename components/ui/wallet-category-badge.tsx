@@ -1,5 +1,6 @@
 import { Landmark, Smartphone } from "lucide-react";
 
+import { WalletLogoDot } from "@/components/ui/wallet-logo-dot";
 import { getWalletBadge } from "@/lib/wallet-badges";
 
 type WalletCategoryBadgeProps = {
@@ -18,11 +19,7 @@ export function WalletCategoryBadge({ category, className = "" }: WalletCategory
       className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold tracking-wide backdrop-blur ${walletBadge.toneClass} ${className}`.trim()}
       title={`${category} wallet badge`}
     >
-      <span
-        className={`inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br ${walletBadge.logoGradientClass} text-[9px] font-bold text-white shadow-sm`}
-      >
-        {walletBadge.logoText}
-      </span>
+      <WalletLogoDot badge={walletBadge} label={category} />
       <span
         className={`inline-flex h-4 w-4 items-center justify-center rounded-full ${walletBadge.iconToneClass}`}
       >

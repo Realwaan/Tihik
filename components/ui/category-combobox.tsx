@@ -25,6 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { WalletLogoDot } from "@/components/ui/wallet-logo-dot";
 import { getWalletBadge } from "@/lib/wallet-badges";
 
 type CategoryComboboxProps = {
@@ -285,11 +286,12 @@ export function CategoryCombobox({
                         <span
                           className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide ${walletBadge.toneClass}`}
                         >
-                          <span
-                            className={`inline-flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-br ${walletBadge.logoGradientClass} text-[8px] font-bold text-white`}
-                          >
-                            {walletBadge.logoText}
-                          </span>
+                          <WalletLogoDot
+                            badge={walletBadge}
+                            label={option}
+                            sizeClass="h-4 w-4"
+                            textClass="text-[8px]"
+                          />
                           {walletBadge.code}
                         </span>
                       ) : null}

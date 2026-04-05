@@ -6,9 +6,18 @@ export type WalletBadge = {
   iconToneClass: string;
   logoText: string;
   logoGradientClass: string;
+  officialLogoPath?: string;
+  officialLogoUrl?: string;
 };
 
 type WalletBadgeSeed = Omit<WalletBadge, "logoText" | "logoGradientClass">;
+
+type LogoOverride = {
+  logoText: string;
+  logoGradientClass: string;
+  officialLogoPath?: string;
+  officialLogoUrl?: string;
+};
 
 const WALLET_LOGO_GRADIENTS = [
   "from-sky-500 to-blue-600",
@@ -27,6 +36,141 @@ const BANK_LOGO_GRADIENTS = [
   "from-fuchsia-600 to-pink-700",
   "from-slate-600 to-slate-800",
 ];
+
+const LOGO_OVERRIDES_BY_CODE: Record<string, LogoOverride> = {
+  GC: {
+    logoText: "G",
+    logoGradientClass: "from-[#0057ff] to-[#00a2ff]",
+    officialLogoPath: "/logos/wallets/gcash.svg",
+    officialLogoUrl: "https://logo.clearbit.com/gcash.com",
+  },
+  MY: {
+    logoText: "M",
+    logoGradientClass: "from-[#00d17b] to-[#007a52]",
+    officialLogoPath: "/logos/wallets/maya.svg",
+    officialLogoUrl: "https://logo.clearbit.com/maya.ph",
+  },
+  GT: {
+    logoText: "G",
+    logoGradientClass: "from-[#f4c430] to-[#cc8f00]",
+    officialLogoPath: "/logos/wallets/gotyme.svg",
+    officialLogoUrl: "https://logo.clearbit.com/gotyme.com.ph",
+  },
+  GP: {
+    logoText: "G",
+    logoGradientClass: "from-[#00b14f] to-[#007f39]",
+    officialLogoPath: "/logos/wallets/grabpay.svg",
+    officialLogoUrl: "https://logo.clearbit.com/grab.com",
+  },
+  SP: {
+    logoText: "S",
+    logoGradientClass: "from-[#ff6a2b] to-[#ee4d2d]",
+    officialLogoPath: "/logos/wallets/shopeepay.svg",
+    officialLogoUrl: "https://logo.clearbit.com/shopee.ph",
+  },
+  CP: {
+    logoText: "C",
+    logoGradientClass: "from-[#0052ff] to-[#009bff]",
+    officialLogoPath: "/logos/wallets/coins-ph.svg",
+    officialLogoUrl: "https://logo.clearbit.com/coins.ph",
+  },
+  PP: {
+    logoText: "P",
+    logoGradientClass: "from-[#05a98c] to-[#067a6e]",
+    officialLogoPath: "/logos/wallets/palawanpay.svg",
+    officialLogoUrl: "https://logo.clearbit.com/palawanpay.com",
+  },
+  DT: {
+    logoText: "D",
+    logoGradientClass: "from-[#7c3aed] to-[#5b21b6]",
+    officialLogoPath: "/logos/wallets/diskartech.svg",
+    officialLogoUrl: "https://logo.clearbit.com/diskartech.ph",
+  },
+  BPI: {
+    logoText: "B",
+    logoGradientClass: "from-[#c1121f] to-[#8f0f18]",
+    officialLogoPath: "/logos/banks/bpi.svg",
+    officialLogoUrl: "https://logo.clearbit.com/bpi.com.ph",
+  },
+  BDO: {
+    logoText: "B",
+    logoGradientClass: "from-[#0a4fa3] to-[#1d9bf0]",
+    officialLogoPath: "/logos/banks/bdo.svg",
+    officialLogoUrl: "https://logo.clearbit.com/bdo.com.ph",
+  },
+  UB: {
+    logoText: "U",
+    logoGradientClass: "from-[#f97316] to-[#ea580c]",
+    officialLogoPath: "/logos/banks/unionbank.svg",
+    officialLogoUrl: "https://logo.clearbit.com/unionbankph.com",
+  },
+  LB: {
+    logoText: "L",
+    logoGradientClass: "from-[#15803d] to-[#166534]",
+    officialLogoPath: "/logos/banks/landbank.svg",
+    officialLogoUrl: "https://logo.clearbit.com/landbank.com",
+  },
+  MB: {
+    logoText: "M",
+    logoGradientClass: "from-[#1d4ed8] to-[#dc2626]",
+    officialLogoPath: "/logos/banks/metrobank.svg",
+    officialLogoUrl: "https://logo.clearbit.com/metrobank.com.ph",
+  },
+  RCBC: {
+    logoText: "R",
+    logoGradientClass: "from-[#1d4ed8] to-[#1e3a8a]",
+    officialLogoPath: "/logos/banks/rcbc.svg",
+    officialLogoUrl: "https://logo.clearbit.com/rcbc.com",
+  },
+  SB: {
+    logoText: "S",
+    logoGradientClass: "from-[#0ea5e9] to-[#059669]",
+    officialLogoPath: "/logos/banks/security-bank.svg",
+    officialLogoUrl: "https://logo.clearbit.com/securitybank.com",
+  },
+  PNB: {
+    logoText: "P",
+    logoGradientClass: "from-[#1e3a8a] to-[#be123c]",
+    officialLogoPath: "/logos/banks/pnb.svg",
+    officialLogoUrl: "https://logo.clearbit.com/pnb.com.ph",
+  },
+  CB: {
+    logoText: "C",
+    logoGradientClass: "from-[#ef4444] to-[#b91c1c]",
+    officialLogoPath: "/logos/banks/chinabank.svg",
+    officialLogoUrl: "https://logo.clearbit.com/chinabank.ph",
+  },
+  EW: {
+    logoText: "E",
+    logoGradientClass: "from-[#d946ef] to-[#a21caf]",
+    officialLogoPath: "/logos/banks/eastwest.svg",
+    officialLogoUrl: "https://logo.clearbit.com/eastwestbanker.com",
+  },
+  SEA: {
+    logoText: "S",
+    logoGradientClass: "from-[#f97316] to-[#ea580c]",
+    officialLogoPath: "/logos/banks/seabank.svg",
+    officialLogoUrl: "https://logo.clearbit.com/seabank.ph",
+  },
+  TON: {
+    logoText: "T",
+    logoGradientClass: "from-[#7c3aed] to-[#6d28d9]",
+    officialLogoPath: "/logos/banks/tonik.svg",
+    officialLogoUrl: "https://logo.clearbit.com/tonikbank.com",
+  },
+  UNO: {
+    logoText: "U",
+    logoGradientClass: "from-[#16a34a] to-[#15803d]",
+    officialLogoPath: "/logos/banks/uno-bank.svg",
+    officialLogoUrl: "https://logo.clearbit.com/unobank.asia",
+  },
+  KOMO: {
+    logoText: "K",
+    logoGradientClass: "from-[#0284c7] to-[#0369a1]",
+    officialLogoPath: "/logos/banks/komo.svg",
+    officialLogoUrl: "https://logo.clearbit.com/komo.ph",
+  },
+};
 
 function normalizeLogoText(code: string) {
   const compact = code.replace(/[^a-z0-9]/gi, "").toUpperCase();
@@ -276,9 +420,14 @@ export function getWalletBadge(category: string): WalletBadge | null {
 
   if (!matched) return null;
 
+  const logoOverride = LOGO_OVERRIDES_BY_CODE[matched.badge.code.toUpperCase()];
+
   return {
     ...matched.badge,
-    logoText: normalizeLogoText(matched.badge.code),
-    logoGradientClass: pickGradient(normalized, matched.badge.kind),
+    logoText: logoOverride?.logoText ?? normalizeLogoText(matched.badge.code),
+    logoGradientClass:
+      logoOverride?.logoGradientClass ?? pickGradient(normalized, matched.badge.kind),
+    officialLogoPath: logoOverride?.officialLogoPath,
+    officialLogoUrl: logoOverride?.officialLogoUrl,
   };
 }
