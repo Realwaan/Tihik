@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { userHasHouseholdAccess } from "@/lib/collaboration";
+import { isUserEmailVerified, userHasHouseholdAccess } from "@/lib/collaboration";
 import { prisma } from "@/lib/prisma";
 import { householdInviteSchema } from "@/lib/validations/collaboration";
 
@@ -10,6 +10,14 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const verified = await isUserEmailVerified(session.user.id);
+    if (!verified) {
+      return NextResponse.json(
+        { error: "Please verify your email before inviting members." },
+        { status: 403 }
+      );
     }
 
     const json = await request.json().catch(() => null);
@@ -43,13 +51,20 @@ export async function POST(request: NextRequest) {
           mode: "insensitive",
         },
       },
-      select: { id: true, email: true, name: true },
+      select: { id: true, email: true, name: true, emailVerified: true },
     });
 
     if (!invitedUser) {
       return NextResponse.json(
         { error: "User with this email does not exist" },
         { status: 404 }
+      );
+    }
+
+    if (!invitedUser.emailVerified) {
+      return NextResponse.json(
+        { error: "The invited user must verify their email before joining collaboration groups." },
+        { status: 409 }
       );
     }
 

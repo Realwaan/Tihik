@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
+import { isUserEmailVerified } from "@/lib/collaboration";
 import { prisma } from "@/lib/prisma";
 import { householdCreateSchema } from "@/lib/validations/collaboration";
 
@@ -9,6 +10,14 @@ export async function GET() {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const verified = await isUserEmailVerified(session.user.id);
+    if (!verified) {
+      return NextResponse.json(
+        { error: "Please verify your email before creating collaboration groups." },
+        { status: 403 }
+      );
     }
 
     const households = await prisma.householdMember.findMany({

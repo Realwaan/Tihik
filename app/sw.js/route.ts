@@ -1,16 +1,13 @@
-const sw = `self.addEventListener("install", (event) => {
+const sw = `const STATIC_CACHE = "trackit-static-v2";
+const PRECACHE_URLS = ["/", "/signin", "/signup"];
+
+self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open("trackit-static-v1").then((cache) => {
-      return cache.addAll([
-        "/",
-        "/dashboard",
-        "/transactions",
-        "/budgets",
-        "/signin",
-        "/signup",
-      ]);
+    caches.open(STATIC_CACHE).then((cache) => {
+      return cache.addAll(PRECACHE_URLS);
     })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -18,11 +15,12 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== "trackit-static-v1")
+          .filter((key) => key !== STATIC_CACHE)
           .map((key) => caches.delete(key))
       )
     )
   );
+  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
@@ -32,6 +30,14 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(event.request.url);
   if (url.pathname.startsWith("/api/")) {
+    return;
+  }
+
+  // Keep app navigations network-first so auth redirects and fresh HTML are never stale.
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match("/") || Response.error())
+    );
     return;
   }
 
@@ -48,12 +54,12 @@ self.addEventListener("fetch", (event) => {
           }
 
           const responseToCache = response.clone();
-          caches.open("trackit-static-v1").then((cache) => {
+          caches.open(STATIC_CACHE).then((cache) => {
             cache.put(event.request, responseToCache);
           });
           return response;
         })
-        .catch(() => caches.match("/"));
+        .catch(() => caches.match("/") || Response.error());
     })
   );
 });`;

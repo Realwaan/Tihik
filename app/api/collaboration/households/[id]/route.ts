@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
+import { isUserEmailVerified } from "@/lib/collaboration";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -14,6 +15,14 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const verified = await isUserEmailVerified(session.user.id);
+    if (!verified) {
+      return NextResponse.json(
+        { error: "Please verify your email before deleting households." },
+        { status: 403 }
+      );
     }
 
     const { id } = await context.params;

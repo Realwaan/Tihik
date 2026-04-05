@@ -70,6 +70,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   providers,
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === "google" && user.email) {
+        await prisma.user.updateMany({
+          where: {
+            email: {
+              equals: user.email,
+              mode: "insensitive",
+            },
+            emailVerified: null,
+          },
+          data: {
+            emailVerified: new Date(),
+          },
+        });
+      }
+
+      return true;
+    },
     jwt({ token, user }) {
       if (user) {
         token.id = user.id;

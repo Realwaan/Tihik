@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { userHasHouseholdAccess } from "@/lib/collaboration";
+import { isUserEmailVerified, userHasHouseholdAccess } from "@/lib/collaboration";
 import { prisma } from "@/lib/prisma";
 import { sharedExpenseCreateSchema } from "@/lib/validations/collaboration";
 
@@ -10,6 +10,14 @@ export async function GET(request: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const verified = await isUserEmailVerified(session.user.id);
+    if (!verified) {
+      return NextResponse.json(
+        { error: "Please verify your email before adding shared expenses." },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(request.url);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { createEmailVerificationToken, sendVerificationEmail } from "@/lib/email-verification";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
@@ -14,9 +15,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { name, email, password } = body;
+    const normalizedEmail = String(email ?? "").trim().toLowerCase();
 
     // Validation
-    if (!name || !email || !password) {
+    if (!name || !normalizedEmail || !password) {
       return NextResponse.json(
         { error: "Name, email, and password are required" },
         { status: 400 }
@@ -32,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
       },
       select: {
@@ -60,8 +62,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    const tokenResult = await createEmailVerificationToken(normalizedEmail);
+    const delivery = await sendVerificationEmail(normalizedEmail, tokenResult.token);
+
     return NextResponse.json(
-      { message: "Account created successfully", user },
+      {
+        message: "Account created. Please verify your email before using collaboration features.",
+        user,
+        verificationEmailSent: delivery.delivered,
+      },
       { status: 201 }
     );
   } catch (error) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { userHasHouseholdAccess } from "@/lib/collaboration";
+import { isUserEmailVerified, userHasHouseholdAccess } from "@/lib/collaboration";
 import { prisma } from "@/lib/prisma";
 import { sharedExpenseUpdateSchema } from "@/lib/validations/collaboration";
 
@@ -16,6 +16,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const verified = await isUserEmailVerified(session.user.id);
+    if (!verified) {
+      return NextResponse.json(
+        { error: "Please verify your email before editing shared expenses." },
+        { status: 403 }
+      );
     }
 
     const { id } = await context.params;
@@ -81,6 +89,14 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const verified = await isUserEmailVerified(session.user.id);
+    if (!verified) {
+      return NextResponse.json(
+        { error: "Please verify your email before deleting shared expenses." },
+        { status: 403 }
+      );
     }
 
     const { id } = await context.params;

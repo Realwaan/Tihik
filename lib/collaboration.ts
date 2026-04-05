@@ -17,3 +17,12 @@ export async function userHasHouseholdAccess(
 
   return membership;
 }
+
+export async function isUserEmailVerified(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { emailVerified: true },
+  });
+
+  return Boolean(user?.emailVerified);
+}
