@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { User, Mail, Calendar, ArrowLeft, Loader2 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
@@ -30,10 +31,23 @@ export function ProfilePage() {
   });
 
   useEffect(() => {
+    async function handleSessionExpired() {
+      await signOut({ redirect: false });
+      showToast("error", "Session expired after database reset. Please sign in again.");
+      router.replace("/signin");
+    }
+
     async function loadUser() {
       try {
         const response = await fetch("/api/user/profile");
-        if (!response.ok) throw new Error("Failed to load profile");
+        if (response.status === 401 || response.status === 404) {
+          await handleSessionExpired();
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Failed to load profile");
+        }
         
         const data = await response.json();
         setUser(data.user);
@@ -50,7 +64,7 @@ export function ProfilePage() {
       }
     }
     loadUser();
-  }, [showToast]);
+  }, [router, showToast]);
 
   async function handleSave() {
     setSaving(true);
@@ -60,6 +74,13 @@ export function ProfilePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
+
+      if (response.status === 401 || response.status === 404) {
+        await signOut({ redirect: false });
+        showToast("error", "Session expired after database reset. Please sign in again.");
+        router.replace("/signin");
+        return;
+      }
 
       if (!response.ok) throw new Error("Failed to update profile");
 
@@ -83,7 +104,7 @@ export function ProfilePage() {
   }
 
   return (
-    <main className="page-shell dock-safe min-h-screen bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <main className="page-shell dock-safe app-surface min-h-screen">
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-12">
         {/* Header */}
         <div className="mb-8 flex items-center gap-4">

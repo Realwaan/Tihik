@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Loader2, Send, Sparkles, X } from "lucide-react";
+import { Bot, Loader2, Mic, MicOff, Send, Sparkles, X } from "lucide-react";
 
 type ChatMessage = {
   id: string;
@@ -46,10 +46,13 @@ export function AiAssistantWidget() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([initialMessage]);
+  const [dictationSupported, setDictationSupported] = useState(false);
+  const [dictating, setDictating] = useState(false);
   const [preferredCurrency, setPreferredCurrency] = useState<
     "USD" | "EUR" | "GBP" | "JPY" | "CAD" | "AUD" | "PHP"
   >("USD");
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const speechRecognitionRef = useRef<any>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -76,6 +79,51 @@ export function AiAssistantWidget() {
     }
 
     loadPreference();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const SpeechRecognitionCtor =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
+      setDictationSupported(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "en-US";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0]?.transcript ?? "")
+        .join(" ")
+        .trim();
+
+      if (transcript) {
+        setInput((current) => transcript);
+      }
+    };
+
+    recognition.onend = () => setDictating(false);
+    recognition.onerror = () => setDictating(false);
+
+    speechRecognitionRef.current = recognition;
+    setDictationSupported(true);
+
+    return () => {
+      try {
+        recognition.stop();
+      } catch {
+        // ignore stop errors
+      }
+      speechRecognitionRef.current = null;
+    };
   }, []);
 
   const recentHistory = useMemo(
@@ -157,6 +205,29 @@ export function AiAssistantWidget() {
     }
   }
 
+  function toggleDictation() {
+    const recognition = speechRecognitionRef.current;
+    if (!recognition) {
+      return;
+    }
+
+    if (dictating) {
+      try {
+        recognition.stop();
+      } finally {
+        setDictating(false);
+      }
+      return;
+    }
+
+    try {
+      recognition.start();
+      setDictating(true);
+    } catch {
+      setDictating(false);
+    }
+  }
+
   return (
     <>
       {open ? (
@@ -233,6 +304,20 @@ export function AiAssistantWidget() {
                 placeholder="Ask for analysis (example: analyze my dashboard this month)"
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
+              {dictationSupported ? (
+                <button
+                  type="button"
+                  onClick={toggleDictation}
+                  className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition ${
+                    dictating
+                      ? "border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  }`}
+                  aria-label={dictating ? "Stop voice dictation" : "Start voice dictation"}
+                >
+                  {dictating ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </button>
+              ) : null}
               <button
                 type="submit"
                 disabled={sending || !input.trim()}

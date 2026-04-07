@@ -1,22 +1,29 @@
 "use client";
 
 import type { FormEvent, ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
-import { Loader2, Plus, Trash2, Download, FileUp } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, Plus, Trash2, Download, FileUp, Copy } from "lucide-react";
 import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { CategoryCombobox } from "@/components/ui/category-combobox";
+import {
+  ACCOUNT_TEMPLATE_CATEGORIES,
+} from "@/lib/categories";
 import { mergeCategories } from "@/lib/categories";
 import { parseReceiptText } from "@/lib/receipt-parser";
 
 import { transactionCreateSchema } from "@/lib/validations/transaction";
 
+type TransactionType = "INCOME" | "EXPENSE" | "TRANSFER";
+
 type Transaction = {
   id: string;
   amount: number;
   currency: "USD" | "EUR" | "GBP" | "JPY" | "CAD" | "AUD" | "PHP";
-  type: "INCOME" | "EXPENSE";
+  type: TransactionType;
   category: string;
+  sourceAccount?: string | null;
+  destinationAccount?: string | null;
   note?: string | null;
   date: string;
 };
@@ -24,8 +31,10 @@ type Transaction = {
 type TransactionFormState = {
   amount: string;
   currency: "USD" | "EUR" | "GBP" | "JPY" | "CAD" | "AUD" | "PHP";
-  type: "INCOME" | "EXPENSE";
+  type: TransactionType;
   category: string;
+  sourceAccount: string;
+  destinationAccount: string;
   note: string;
   date: string;
 };
@@ -42,19 +51,28 @@ const initialForm: TransactionFormState = {
   currency: "USD",
   type: "EXPENSE" as const,
   category: "",
+  sourceAccount: "",
+  destinationAccount: "",
   note: "",
   date: new Date().toISOString().slice(0, 10),
 };
+
+const accountOptions = Array.from(
+  new Set([...ACCOUNT_TEMPLATE_CATEGORIES])
+).sort((a, b) => a.localeCompare(b));
+
+const MAX_VISIBLE_TRANSACTIONS = 250;
 
 export function TransactionsManager() {
   const { showToast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [form, setForm] = useState<TransactionFormState>(initialForm);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"ALL" | "INCOME" | "EXPENSE">("ALL");
+  const [filterType, setFilterType] = useState<"ALL" | TransactionType>("ALL");
   const [preferredCurrency, setPreferredCurrency] =
     useState<TransactionFormState["currency"]>("USD");
   const [allCategories, setAllCategories] = useState<string[]>([]);
@@ -106,6 +124,11 @@ export function TransactionsManager() {
   }, []);
 
   useEffect(() => {
+    if (form.type === "TRANSFER") {
+      setAllCategories(accountOptions);
+      return;
+    }
+
     setAllCategories(
       mergeCategories(
         transactions
@@ -124,7 +147,10 @@ export function TransactionsManager() {
       amount: form.amount,
       currency: preferredCurrency,
       type: form.type,
-      category: form.category,
+      category: form.type === "TRANSFER" ? "Transfer" : form.category,
+      sourceAccount: form.sourceAccount || undefined,
+      destinationAccount:
+        form.type === "TRANSFER" ? form.destinationAccount || undefined : undefined,
       note: form.note || undefined,
       date: form.date,
     });
@@ -181,18 +207,50 @@ export function TransactionsManager() {
     }
   }
 
+  async function handleDuplicate(id: string) {
+    try {
+      setDuplicatingId(id);
+      const response = await fetch(`/api/transactions/${id}/duplicate`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to duplicate transaction");
+      }
+
+      showToast("success", "Transaction duplicated.");
+      await loadTransactions();
+    } catch {
+      const errorMsg = "Could not duplicate the transaction.";
+      setError(errorMsg);
+      showToast("error", errorMsg);
+    } finally {
+      setDuplicatingId(null);
+    }
+  }
+
   function exportToCSV() {
-    if (transactions.length === 0) {
+    if (filteredTransactions.length === 0) {
       showToast("warning", "No transactions to export");
       return;
     }
 
-    // Create CSV content
-    const headers = ["Date", "Type", "Category", "Amount", "Currency", "Note"];
-    const rows = transactions.map((t) => [
+    const headers = [
+      "Date",
+      "Type",
+      "Category",
+      "Source Account",
+      "Destination Account",
+      "Amount",
+      "Currency",
+      "Note",
+    ];
+    const rows = filteredTransactions.map((t) => [
       new Date(t.date).toLocaleDateString(),
       t.type,
       t.category,
+      t.sourceAccount || "",
+      t.destinationAccount || "",
       t.amount.toFixed(2),
       t.currency,
       t.note || "",
@@ -223,6 +281,14 @@ export function TransactionsManager() {
       return;
     }
 
+    const totalIncome = filteredTransactions
+      .filter((item) => item.type === "INCOME")
+      .reduce((sum, item) => sum + item.amount, 0);
+    const totalExpense = filteredTransactions
+      .filter((item) => item.type === "EXPENSE")
+      .reduce((sum, item) => sum + item.amount, 0);
+    const netTotal = totalIncome - totalExpense;
+
     const rows = filteredTransactions
       .map(
         (t) => `
@@ -231,7 +297,13 @@ export function TransactionsManager() {
             <td>${t.type}</td>
             <td>${escapeHtml(t.category)}</td>
             <td>${escapeHtml(t.note ?? "")}</td>
-            <td style="text-align:right;">${new Intl.NumberFormat("en-US", {
+            <td class="${
+              t.type === "INCOME"
+                ? "amount-income"
+                : t.type === "EXPENSE"
+                  ? "amount-expense"
+                  : "amount-transfer"
+            }" style="text-align:right;">${new Intl.NumberFormat("en-US", {
               style: "currency",
               currency: t.currency,
               maximumFractionDigits: t.currency === "JPY" ? 0 : 2,
@@ -252,17 +324,124 @@ export function TransactionsManager() {
         <head>
           <title>Transactions Export</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
-            h1 { margin: 0 0 12px; }
-            p { margin: 0 0 16px; color: #475569; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            th, td { border: 1px solid #cbd5e1; padding: 8px; }
-            th { background: #f8fafc; text-align: left; }
+            :root {
+              --ink: #0f172a;
+              --muted: #475569;
+              --line: #cbd5e1;
+              --surface: #f8fafc;
+              --brand: #f59e0b;
+            }
+            * { box-sizing: border-box; }
+            body {
+              font-family: "Segoe UI", Arial, sans-serif;
+              margin: 28px;
+              color: var(--ink);
+              background: white;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+              gap: 16px;
+              border-bottom: 2px solid var(--line);
+              padding-bottom: 14px;
+              margin-bottom: 16px;
+            }
+            .brand {
+              margin: 0;
+              font-size: 24px;
+              line-height: 1.1;
+            }
+            .meta {
+              margin: 4px 0 0;
+              color: var(--muted);
+              font-size: 12px;
+            }
+            .summary {
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 10px;
+              margin-bottom: 14px;
+            }
+            .summary-card {
+              border: 1px solid var(--line);
+              border-radius: 10px;
+              background: var(--surface);
+              padding: 10px 12px;
+            }
+            .summary-card p {
+              margin: 0;
+              color: var(--muted);
+              font-size: 11px;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+            }
+            .summary-card h2 {
+              margin: 4px 0 0;
+              font-size: 16px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 12px;
+            }
+            th, td {
+              border: 1px solid var(--line);
+              padding: 8px;
+              vertical-align: top;
+            }
+            th {
+              background: var(--surface);
+              text-align: left;
+              color: #1e293b;
+            }
+            .amount-income { color: #047857; font-weight: 600; }
+            .amount-expense { color: #b91c1c; font-weight: 600; }
+            .amount-transfer { color: #b45309; font-weight: 600; }
+            .footer {
+              margin-top: 12px;
+              color: var(--muted);
+              font-size: 11px;
+              text-align: right;
+            }
           </style>
         </head>
         <body>
-          <h1>TrackIt Transactions</h1>
-          <p>Generated ${new Date().toLocaleString()}</p>
+          <div class="header">
+            <div>
+              <h1 class="brand">TrackIt Statement</h1>
+              <p class="meta">Generated ${new Date().toLocaleString()}</p>
+            </div>
+            <div style="font-size:12px; color:#64748b;">Records: ${filteredTransactions.length}</div>
+          </div>
+
+          <div class="summary">
+            <div class="summary-card">
+              <p>Total Income</p>
+              <h2>${new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: preferredCurrency,
+                maximumFractionDigits: preferredCurrency === "JPY" ? 0 : 2,
+              }).format(totalIncome)}</h2>
+            </div>
+            <div class="summary-card">
+              <p>Total Expenses</p>
+              <h2>${new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: preferredCurrency,
+                maximumFractionDigits: preferredCurrency === "JPY" ? 0 : 2,
+              }).format(totalExpense)}</h2>
+            </div>
+            <div class="summary-card">
+              <p>Net Movement</p>
+              <h2>${new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: preferredCurrency,
+                maximumFractionDigits: preferredCurrency === "JPY" ? 0 : 2,
+              }).format(netTotal)}</h2>
+            </div>
+          </div>
+
           <table>
             <thead>
               <tr>
@@ -275,6 +454,7 @@ export function TransactionsManager() {
             </thead>
             <tbody>${rows}</tbody>
           </table>
+          <p class="footer">TrackIt export</p>
         </body>
       </html>
     `);
@@ -309,6 +489,8 @@ export function TransactionsManager() {
         const currency = (get("currency") || preferredCurrency).toUpperCase();
         const type = (get("type") || "EXPENSE").toUpperCase();
         const category = get("category").trim();
+        const sourceAccount = (get("source account") || get("account")).trim();
+        const destinationAccount = get("destination account").trim();
         const note = get("note").trim();
         const dateRaw = get("date").trim();
         const dateValue = new Date(dateRaw);
@@ -321,18 +503,54 @@ export function TransactionsManager() {
           currency,
           type,
           category,
+          sourceAccount,
+          destinationAccount,
           note,
           date,
         };
       });
 
       const validRows = importedPayload.filter(
-        (row) =>
-          Number.isFinite(row.amount) &&
-          row.amount > 0 &&
-          ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "PHP"].includes(row.currency) &&
-          ["INCOME", "EXPENSE"].includes(row.type) &&
-          row.category.length > 0
+        (row) => {
+          if (!Number.isFinite(row.amount)) {
+            return false;
+          }
+
+          if (!["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "PHP"].includes(row.currency)) {
+            return false;
+          }
+
+          if (!["INCOME", "EXPENSE", "TRANSFER"].includes(row.type)) {
+            return false;
+          }
+
+          if (row.amount < 0) {
+            return false;
+          }
+
+          if (row.type === "TRANSFER") {
+            return (
+              row.amount > 0 &&
+              row.sourceAccount.length > 0 &&
+              row.destinationAccount.length > 0 &&
+              row.sourceAccount.toLowerCase() !== row.destinationAccount.toLowerCase()
+            );
+          }
+
+          if (row.amount > 0) {
+            return row.category.length > 0;
+          }
+
+          const date = new Date(row.date);
+          if (Number.isNaN(date.getTime())) {
+            return false;
+          }
+
+          const today = new Date();
+          const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+          return dateStart > todayStart && row.category.length > 0;
+        }
       );
 
       if (validRows.length === 0) {
@@ -340,7 +558,7 @@ export function TransactionsManager() {
         return;
       }
 
-      await Promise.all(
+      const responses = await Promise.all(
         validRows.map((row) =>
           fetch("/api/transactions", {
             method: "POST",
@@ -349,7 +567,10 @@ export function TransactionsManager() {
               amount: row.amount,
               currency: row.currency,
               type: row.type,
-              category: row.category,
+              category: row.type === "TRANSFER" ? "Transfer" : row.category,
+              sourceAccount: row.sourceAccount || undefined,
+              destinationAccount:
+                row.type === "TRANSFER" ? row.destinationAccount || undefined : undefined,
               note: row.note || undefined,
               date: row.date,
             }),
@@ -357,10 +578,26 @@ export function TransactionsManager() {
         )
       );
 
-      showToast(
-        "success",
-        `Imported ${validRows.length} transaction${validRows.length === 1 ? "" : "s"} from CSV.`
-      );
+      const failedRows = responses.filter((response) => !response.ok).length;
+      const importedCount = responses.length - failedRows;
+
+      if (importedCount === 0) {
+        showToast("error", "CSV import failed. No rows were saved.");
+        return;
+      }
+
+      if (failedRows > 0) {
+        showToast(
+          "warning",
+          `Imported ${importedCount} row${importedCount === 1 ? "" : "s"}; ${failedRows} failed.`
+        );
+      } else {
+        showToast(
+          "success",
+          `Imported ${importedCount} transaction${importedCount === 1 ? "" : "s"} from CSV.`
+        );
+      }
+
       await loadTransactions();
     } catch {
       showToast("error", "CSV import failed. Please verify file format.");
@@ -432,7 +669,7 @@ export function TransactionsManager() {
 
   useEffect(() => {
     const trimmedNote = form.note.trim();
-    if (!trimmedNote || form.category.trim()) {
+    if (form.type === "TRANSFER" || !trimmedNote || form.category.trim()) {
       return;
     }
 
@@ -497,17 +734,26 @@ export function TransactionsManager() {
     setDragStart(null);
   }
 
-  // Filter transactions based on search and type
-  const filteredTransactions = transactions.filter((t) => {
-    const matchesSearch = 
-      t.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.note?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
-      t.amount.toString().includes(searchQuery);
-    
-    const matchesType = filterType === "ALL" || t.type === filterType;
-    
-    return matchesSearch && matchesType;
-  });
+  const filteredTransactions = useMemo(() => {
+    const normalizedSearch = searchQuery.toLowerCase();
+    return transactions.filter((t) => {
+      const matchesSearch =
+        t.category.toLowerCase().includes(normalizedSearch) ||
+        (t.note?.toLowerCase().includes(normalizedSearch) ?? false) ||
+        (t.sourceAccount?.toLowerCase().includes(normalizedSearch) ?? false) ||
+        (t.destinationAccount?.toLowerCase().includes(normalizedSearch) ?? false) ||
+        t.amount.toString().includes(normalizedSearch);
+
+      const matchesType = filterType === "ALL" || t.type === filterType;
+
+      return matchesSearch && matchesType;
+    });
+  }, [transactions, searchQuery, filterType]);
+
+  const visibleTransactions = useMemo(
+    () => filteredTransactions.slice(0, MAX_VISIBLE_TRANSACTIONS),
+    [filteredTransactions]
+  );
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
@@ -515,7 +761,7 @@ export function TransactionsManager() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Add transaction</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Quickly log income and expenses.</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Quickly log income, expenses, and transfers.</p>
           </div>
           <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-200">
             {preferredCurrency} profile currency
@@ -538,30 +784,76 @@ export function TransactionsManager() {
             <Field label="Type">
               <select
                 value={form.type}
-                onChange={(event) => setForm((current) => ({ ...current, type: event.target.value as "INCOME" | "EXPENSE" }))}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    type: event.target.value as TransactionType,
+                    category:
+                      event.target.value === "TRANSFER"
+                        ? "Transfer"
+                        : current.category,
+                  }))
+                }
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-amber-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               >
                 <option value="EXPENSE">Expense</option>
                 <option value="INCOME">Income</option>
-                </select>
+                <option value="TRANSFER">Transfer</option>
+              </select>
             </Field>
           </div>
 
-          <Field label="Category">
-            <CategoryCombobox
-              value={form.category}
-              onChange={(value) =>
-                setForm((current) => ({ ...current, category: value }))
-              }
-              options={allCategories}
-              placeholder="Food, Rent, Salary..."
-            />
-            {suggestingCategory ? (
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Suggesting category from note...
-              </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={form.type === "TRANSFER" ? "From account" : "Account"}>
+              <CategoryCombobox
+                value={form.sourceAccount}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, sourceAccount: value }))
+                }
+                options={accountOptions}
+                placeholder="Cash, GCash, BPI..."
+              />
+            </Field>
+
+            {form.type === "TRANSFER" ? (
+              <Field label="To account">
+                <CategoryCombobox
+                  value={form.destinationAccount}
+                  onChange={(value) =>
+                    setForm((current) => ({ ...current, destinationAccount: value }))
+                  }
+                  options={accountOptions}
+                  placeholder="Cash, Maya, UnionBank..."
+                />
+              </Field>
             ) : null}
-          </Field>
+          </div>
+
+          {form.type === "TRANSFER" ? (
+            <Field label="Category">
+              <input
+                value="Transfer"
+                readOnly
+                className="w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-600 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              />
+            </Field>
+          ) : (
+            <Field label="Category">
+              <CategoryCombobox
+                value={form.category}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, category: value }))
+                }
+                options={allCategories}
+                placeholder="Food, Rent, Salary..."
+              />
+              {suggestingCategory ? (
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Suggesting category from note...
+                </p>
+              ) : null}
+            </Field>
+          )}
 
           {form.type === "EXPENSE" ? (
             <details className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-950/40">
@@ -827,6 +1119,16 @@ export function TransactionsManager() {
                 >
                   Expense
                 </button>
+                <button
+                  onClick={() => setFilterType("TRANSFER")}
+                  className={`cursor-pointer rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                    filterType === "TRANSFER"
+                      ? "border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  Transfer
+                </button>
               </div>
             </div>
           </div>
@@ -853,26 +1155,60 @@ export function TransactionsManager() {
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredTransactions.map((transaction) => (
+              {visibleTransactions.map((transaction) => (
                 <article key={transaction.id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 px-4 py-4 dark:border-slate-700 dark:bg-slate-950/50">
                   <div>
                     <div className="flex items-center gap-3">
                       <p className="font-medium text-slate-900 dark:text-slate-100">{transaction.category}</p>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${transaction.type === "INCOME" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"}`}>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                        transaction.type === "INCOME"
+                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : transaction.type === "EXPENSE"
+                            ? "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
+                            : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                      }`}>
                         {transaction.type}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{transaction.note || transaction.date.slice(0, 10)}</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      {transaction.type === "TRANSFER"
+                        ? transaction.note ||
+                          `${transaction.sourceAccount || "Unknown"} to ${transaction.destinationAccount || "Unknown"}`
+                        : transaction.note || transaction.date.slice(0, 10)}
+                    </p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <p className={`text-sm font-semibold ${transaction.type === "INCOME" ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
-                      {transaction.type === "INCOME" ? "+" : "-"}
+                    <p className={`text-sm font-semibold ${
+                      transaction.type === "INCOME"
+                        ? "text-emerald-700 dark:text-emerald-400"
+                        : transaction.type === "EXPENSE"
+                          ? "text-rose-700 dark:text-rose-400"
+                          : "text-amber-700 dark:text-amber-400"
+                    }`}>
+                      {transaction.type === "INCOME"
+                        ? "+"
+                        : transaction.type === "EXPENSE"
+                          ? "-"
+                          : "↔ "}
                       {new Intl.NumberFormat("en-US", {
                         style: "currency",
                         currency: transaction.currency,
                         maximumFractionDigits: transaction.currency === "JPY" ? 0 : 2,
                       }).format(Number(transaction.amount))}
                     </p>
+                    <button
+                      type="button"
+                      disabled={duplicatingId === transaction.id}
+                      onClick={() => handleDuplicate(transaction.id)}
+                       className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-400 dark:hover:border-amber-800 dark:hover:bg-amber-900/30 dark:hover:text-amber-300"
+                      aria-label="Duplicate transaction"
+                    >
+                      {duplicatingId === transaction.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(transaction.id)}
@@ -884,6 +1220,11 @@ export function TransactionsManager() {
                   </div>
                 </article>
               ))}
+              {filteredTransactions.length > visibleTransactions.length ? (
+                <p className="pt-1 text-center text-xs text-slate-500 dark:text-slate-400">
+                  Showing {visibleTransactions.length} of {filteredTransactions.length} transactions for smoother rendering.
+                </p>
+              ) : null}
             </div>
           )}
         </div>

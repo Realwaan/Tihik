@@ -10,12 +10,24 @@ datasource db {
 enum TransactionType {
   INCOME
   EXPENSE
+  TRANSFER
 }
 
 enum RecurrenceFrequency {
   DAILY
   WEEKLY
   MONTHLY
+}
+
+enum InstallmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum InstallmentAccountType {
+  DEBIT
+  CREDIT
 }
 
 enum HouseholdRole {
@@ -46,6 +58,8 @@ model User {
   transactions        Transaction[]
   budgets             Budget[]
   recurringTemplates  RecurringTransaction[]
+  installmentPlans    InstallmentPlan[]
+  installmentPayments InstallmentPayment[]
   ownedHouseholds     Household[]           @relation("HouseholdOwner")
   householdMemberships HouseholdMember[]
   paidSharedExpenses  SharedExpense[]       @relation("SharedExpensePayer")
@@ -110,21 +124,79 @@ model Transaction {
   currency            Currency             @default(USD)
   type                TransactionType
   category            String
+  sourceAccount       String?
+  destinationAccount  String?
   note                String?
   date                DateTime
   userId              String
   sourceRecurringId   String?
+  sourceInstallmentId String?
   recurrenceOccurrence DateTime?
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   sourceRecurring     RecurringTransaction? @relation(fields: [sourceRecurringId], references: [id], onDelete: SetNull)
+  sourceInstallment   InstallmentPlan?    @relation(fields: [sourceInstallmentId], references: [id], onDelete: SetNull)
+  installmentPayment  InstallmentPayment? @relation("InstallmentPaymentTransaction")
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
   @@index([userId, date])
   @@index([userId, type, date])
   @@index([userId, category])
+  @@index([userId, sourceAccount, date])
+  @@index([userId, destinationAccount, date])
   @@index([sourceRecurringId])
+  @@index([sourceInstallmentId])
   @@unique([sourceRecurringId, recurrenceOccurrence])
+}
+
+model InstallmentPlan {
+  id                String                  @id @default(cuid())
+  userId            String
+  title             String
+  totalAmount       Float
+  paidAmount        Float                   @default(0)
+  currency          Currency                @default(USD)
+  totalInstallments Int
+  paidInstallments  Int                     @default(0)
+  installmentAmount Float
+  frequency         RecurrenceFrequency     @default(MONTHLY)
+  interval          Int                     @default(1)
+  startDate         DateTime
+  nextDueDate       DateTime
+  sourceAccount     String?
+  accountType       InstallmentAccountType  @default(DEBIT)
+  note              String?
+  status            InstallmentStatus       @default(ACTIVE)
+  lastPaymentAt     DateTime?
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments          InstallmentPayment[]
+  transactions      Transaction[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  @@index([userId, status, nextDueDate])
+  @@index([userId, sourceAccount])
+}
+
+model InstallmentPayment {
+  id                  String         @id @default(cuid())
+  planId              String
+  userId              String
+  amount              Float
+  currency            Currency       @default(USD)
+  installmentsCovered Int            @default(1)
+  paidAt              DateTime
+  sourceAccount       String?
+  note                String?
+  linkedTransactionId String?        @unique
+  plan                InstallmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedTransaction   Transaction?    @relation("InstallmentPaymentTransaction", fields: [linkedTransactionId], references: [id], onDelete: SetNull)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([userId, paidAt])
+  @@index([planId, paidAt])
 }
 
 model Budget {

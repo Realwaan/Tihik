@@ -26,7 +26,13 @@ export async function GET() {
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json(
+        {
+          error: "Session user was not found. Please sign in again.",
+          code: "SESSION_STALE",
+        },
+        { status: 401 }
+      );
     }
 
     return NextResponse.json({ user, converted: false }, { status: 200 });
@@ -85,7 +91,13 @@ export async function PATCH(request: NextRequest) {
     });
 
     if (!currentUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json(
+        {
+          error: "Session user was not found. Please sign in again.",
+          code: "SESSION_STALE",
+        },
+        { status: 401 }
+      );
     }
 
     const targetCurrency =

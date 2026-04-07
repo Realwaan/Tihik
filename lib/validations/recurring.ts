@@ -3,7 +3,7 @@ import { z } from "zod";
 const amountSchema = z.coerce
   .number({ invalid_type_error: "Amount must be a number" })
   .finite("Amount must be a valid number")
-  .positive("Amount must be greater than 0");
+  .min(0, "Amount cannot be negative");
 
 const dateSchema = z.coerce.date({
   invalid_type_error: "Date must be a valid date",
@@ -14,6 +14,7 @@ export const recurringCreateSchema = z.object({
   currency: z.enum(["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "PHP"]).default("USD"),
   type: z.enum(["INCOME", "EXPENSE"]),
   category: z.string().trim().min(1, "Category is required").max(100),
+  sourceAccount: z.string().trim().max(100).optional().nullable(),
   note: z.string().trim().max(500).optional().nullable(),
   frequency: z.enum(["DAILY", "WEEKLY", "MONTHLY"]),
   interval: z.coerce.number().int().min(1).max(30).default(1),

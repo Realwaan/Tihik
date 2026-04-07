@@ -105,6 +105,14 @@ type NotificationItem = {
   createdAt: string;
 };
 
+type TransactionLite = {
+  amount: number;
+  type: "INCOME" | "EXPENSE" | "TRANSFER";
+  category: string;
+  sourceAccount?: string | null;
+  destinationAccount?: string | null;
+};
+
 type NotificationPreferences = {
   budgetNearEnabled: boolean;
   budgetOverEnabled: boolean;
@@ -147,6 +155,7 @@ export function DashboardDashboard() {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [accountView, setAccountView] = useState<"ALL" | "DEBIT" | "CREDIT">("ALL");
   const [accountCardsAnimated, setAccountCardsAnimated] = useState(true);
+  const [previousDebitNetWorth, setPreviousDebitNetWorth] = useState<number | null>(null);
   const notificationsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -192,8 +201,35 @@ export function DashboardDashboard() {
       }
     }
 
+    async function loadPreviousDayNetWorth() {
+      try {
+        const today = new Date();
+        const todayStart = new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate()
+        );
+        const yesterdayEnd = new Date(todayStart.getTime() - 1);
+        const response = await fetch(
+          `/api/transactions?endDate=${encodeURIComponent(yesterdayEnd.toISOString())}`,
+          { signal: controller.signal }
+        );
+        if (!response.ok) {
+          return;
+        }
+        const json = await response.json();
+        const rows = (json.data ?? []) as TransactionLite[];
+        setPreviousDebitNetWorth(computeDebitNetWorth(rows));
+      } catch (fetchError) {
+        if ((fetchError as Error).name !== "AbortError") {
+          setPreviousDebitNetWorth(null);
+        }
+      }
+    }
+
     loadDashboard();
     loadPreference();
+    loadPreviousDayNetWorth();
     return () => controller.abort();
   }, []);
 
@@ -290,6 +326,17 @@ export function DashboardDashboard() {
     () => accountCards.filter((item) => item.balance >= 0).reduce((sum, item) => sum + item.balance, 0),
     [accountCards]
   );
+  const netWorthChangePercent = useMemo(() => {
+    if (previousDebitNetWorth === null) {
+      return null;
+    }
+
+    if (Math.abs(previousDebitNetWorth) < 0.00001) {
+      return debitNetWorth === 0 ? 0 : null;
+    }
+
+    return ((debitNetWorth - previousDebitNetWorth) / Math.abs(previousDebitNetWorth)) * 100;
+  }, [debitNetWorth, previousDebitNetWorth]);
   const warningCount = notifications.filter((n) => n.severity === "warning" && !readNotificationIds.has(n.id)).length;
   const unreadCount = notifications.filter((n) => !readNotificationIds.has(n.id)).length;
 
@@ -398,7 +445,7 @@ export function DashboardDashboard() {
   }
 
   return (
-    <main className="page-shell dock-safe min-h-screen bg-white text-slate-900 dark:bg-gradient-to-b dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-slate-100">
+    <main className="page-shell dock-safe app-surface min-h-screen">
       <div className="reveal relative z-40 overflow-visible border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-10">
           <div>
@@ -418,6 +465,12 @@ export function DashboardDashboard() {
                 Budgets
               </Button>
             </a>
+            <a href="/plan" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full justify-center sm:w-auto">
+                <CreditCard className="h-4 w-4" />
+                Plan
+              </Button>
+            </a>
             <a href="/collaboration" className="w-full sm:w-auto">
               <Button variant="outline" className="w-full justify-center sm:w-auto">
                 <Users className="h-4 w-4" />
@@ -427,7 +480,7 @@ export function DashboardDashboard() {
             <a href="/profile" className="w-full sm:w-auto">
               <Button variant="outline" className="w-full justify-center sm:w-auto">
                 <User className="h-4 w-4" />
-                Profile
+                Settings
               </Button>
             </a>
             <div className="relative z-50 col-span-2 w-full sm:col-span-1 sm:w-auto" ref={notificationsRef}>
@@ -715,7 +768,7 @@ export function DashboardDashboard() {
         ) : (
           <>
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <MetricCard label="Current balance" value={formatCurrency(data?.currentBalance ?? 0, preferredCurrency)} icon={Wallet} accent="amber" />
+              <MetricCard label="Net cashflow" value={formatCurrency(data?.currentBalance ?? 0, preferredCurrency)} icon={Wallet} accent="amber" />
               <MetricCard label="Total income" value={formatCurrency(data?.totalIncome ?? 0, preferredCurrency)} icon={ArrowUpRight} accent="emerald" />
               <MetricCard label="Total expenses" value={formatCurrency(data?.totalExpenses ?? 0, preferredCurrency)} icon={PieChart} accent="rose" />
             </section>
@@ -729,7 +782,11 @@ export function DashboardDashboard() {
                 <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/60">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Net worth</p>
                   <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{formatCurrency(debitNetWorth, preferredCurrency)}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Debit balances only</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {netWorthChangePercent === null
+                      ? "Debit balances only"
+                      : `${netWorthChangePercent >= 0 ? "+" : ""}${netWorthChangePercent.toFixed(1)}% vs previous day`}
+                  </p>
                 </div>
               </div>
 
@@ -748,6 +805,12 @@ export function DashboardDashboard() {
                     {filter === "ALL" ? "All" : filter === "DEBIT" ? "Debit" : "Credit"}
                   </button>
                 ))}
+                <a
+                  href="/account-overview"
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  Account overview
+                </a>
               </div>
 
               {(data?.walletBreakdown?.uncategorizedAccounts ?? []).length > 0 ? (
@@ -1136,6 +1199,34 @@ export function DashboardDashboard() {
       <MobileNavDock />
     </main>
   );
+}
+
+function computeDebitNetWorth(rows: TransactionLite[]) {
+  const balances = new Map<string, number>();
+
+  function applySignedAmount(accountName: string | null | undefined, signedAmount: number) {
+    const account = accountName?.trim();
+    if (!account || !signedAmount) return;
+    balances.set(account, (balances.get(account) ?? 0) + signedAmount);
+  }
+
+  for (const row of rows) {
+    const amount = row.amount ?? 0;
+    if (!amount) continue;
+
+    if (row.type === "TRANSFER") {
+      applySignedAmount(row.sourceAccount || row.category, -amount);
+      applySignedAmount(row.destinationAccount, amount);
+      continue;
+    }
+
+    const direction = row.type === "INCOME" ? 1 : -1;
+    applySignedAmount(row.sourceAccount || row.category, amount * direction);
+  }
+
+  return Array.from(balances.values())
+    .filter((value) => value >= 0)
+    .reduce((sum, value) => sum + value, 0);
 }
 
 function MetricCard({

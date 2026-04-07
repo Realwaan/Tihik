@@ -107,7 +107,7 @@ export function PageLoadingSkeleton({ variant }: PageLoadingSkeletonProps) {
 
   if (variant === "auth") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 px-4 py-12 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+      <div className="page-shell auth-surface flex min-h-screen items-center justify-center px-4 py-12">
         <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-2xl shadow-slate-200/60 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/30">
           <div className="space-y-4">
             {line(128, 14)}
@@ -132,7 +132,7 @@ export function PageLoadingSkeleton({ variant }: PageLoadingSkeletonProps) {
   }
 
   return (
-    <main className="page-shell min-h-screen bg-white px-6 py-8 text-slate-900 dark:bg-slate-900 dark:text-slate-100 lg:px-10">
+    <main className="page-shell app-surface min-h-screen px-6 py-8 lg:px-10">
       <div className="mx-auto max-w-7xl space-y-8">
         <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
           <div className="flex flex-wrap items-start justify-between gap-4">

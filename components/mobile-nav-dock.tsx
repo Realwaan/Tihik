@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, HandCoins, House, Repeat2, Users } from "lucide-react";
+import { BarChart3, HandCoins, House, Repeat2, Users, Wallet } from "lucide-react";
 
 import { triggerHaptic } from "@/lib/haptics";
 
@@ -17,6 +17,7 @@ const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: House },
   { label: "Transactions", href: "/transactions", icon: Repeat2 },
   { label: "Budgets", href: "/budgets", icon: BarChart3 },
+  { label: "Plan", href: "/plan", icon: Wallet },
   { label: "Collaboration", href: "/collaboration", icon: Users },
   { label: "Profile", href: "/profile", icon: HandCoins },
 ];

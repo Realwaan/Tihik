@@ -6,6 +6,7 @@ import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { CategoryCombobox } from "@/components/ui/category-combobox";
 import { WalletCategoryBadge } from "@/components/ui/wallet-category-badge";
+import { ACCOUNT_TEMPLATE_CATEGORIES } from "@/lib/categories";
 import { mergeCategories } from "@/lib/categories";
 
 type RecurringTemplate = {
@@ -14,6 +15,7 @@ type RecurringTemplate = {
   currency: "USD" | "EUR" | "GBP" | "JPY" | "CAD" | "AUD" | "PHP";
   type: "INCOME" | "EXPENSE";
   category: string;
+  sourceAccount?: string | null;
   note?: string | null;
   frequency: "DAILY" | "WEEKLY" | "MONTHLY";
   interval: number;
@@ -28,6 +30,7 @@ type FormState = {
   currency: "USD" | "EUR" | "GBP" | "JPY" | "CAD" | "AUD" | "PHP";
   type: "INCOME" | "EXPENSE";
   category: string;
+  sourceAccount: string;
   note: string;
   frequency: "DAILY" | "WEEKLY" | "MONTHLY";
   interval: string;
@@ -40,6 +43,7 @@ const initialForm: FormState = {
   currency: "USD",
   type: "EXPENSE",
   category: "",
+  sourceAccount: "",
   note: "",
   frequency: "MONTHLY",
   interval: "1",
@@ -118,8 +122,8 @@ export function RecurringManager() {
     }
 
     const amount = Number(form.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      showToast("error", "Amount must be greater than 0.");
+    if (!Number.isFinite(amount) || amount < 0) {
+      showToast("error", "Amount cannot be negative.");
       return;
     }
 
@@ -141,6 +145,7 @@ export function RecurringManager() {
           currency: form.currency,
           type: form.type,
           category: form.category.trim(),
+          sourceAccount: form.sourceAccount.trim() || null,
           note: form.note.trim() || null,
           frequency: form.frequency,
           interval,
@@ -154,7 +159,7 @@ export function RecurringManager() {
       }
 
       showToast("success", "Recurring template created.");
-      setForm({ ...initialForm, currency: preferredCurrency });
+  setForm({ ...initialForm, currency: preferredCurrency });
       await loadTemplates();
     } catch {
       showToast("error", "Could not create recurring template.");
@@ -208,7 +213,7 @@ export function RecurringManager() {
   }
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/90">
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
           Recurring transactions
@@ -285,6 +290,19 @@ export function RecurringManager() {
               }
               options={allCategories}
               placeholder="Rent, Salary, Subscription..."
+            />
+          </Field>
+
+          <Field label="Pay from account (optional)">
+            <CategoryCombobox
+              value={form.sourceAccount}
+              onChange={(value) =>
+                setForm((current) => ({ ...current, sourceAccount: value }))
+              }
+              options={Array.from(new Set([...ACCOUNT_TEMPLATE_CATEGORIES])).sort((a, b) =>
+                a.localeCompare(b)
+              )}
+              placeholder="Cash, Visa Credit, BPI..."
             />
           </Field>
 
@@ -414,6 +432,11 @@ export function RecurringManager() {
                         {template.interval > 1 ? "s" : ""} • Next{" "}
                         {new Date(template.nextRunDate).toLocaleDateString()}
                       </p>
+                      {template.sourceAccount ? (
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          Account: {template.sourceAccount}
+                        </p>
+                      ) : null}
                       {template.isActive &&
                       new Date(template.nextRunDate) <
                         new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()) ? (

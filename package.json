@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "transactions:backfill-accounts": "node scripts/backfill-transaction-accounts.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",

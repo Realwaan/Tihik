@@ -70,18 +70,17 @@ export function SignupForm() {
 
   return (
     <div className="w-full max-w-md px-1 sm:px-0">
-      {/* Card with proper light mode contrast */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/95 sm:p-8">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Create Account</h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">Create Account</h1>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
             Start tracking your expenses today
           </p>
         </div>
 
         {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
-            <p className="text-sm font-medium text-red-900">{error}</p>
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30">
+            <p className="text-sm font-medium text-red-900 dark:text-red-300">{error}</p>
           </div>
         )}
 
@@ -90,13 +89,13 @@ export function SignupForm() {
           <div>
             <label 
               htmlFor="name" 
-              className="mb-2 block text-sm font-medium text-slate-900"
+              className="mb-2 block text-sm font-medium text-slate-900 dark:text-slate-200"
             >
               Full Name
             </label>
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                <User className="h-5 w-5 text-slate-400" />
+                <User className="h-5 w-5 text-slate-400 dark:text-slate-500" />
               </div>
               <input
                 type="text"
@@ -105,7 +104,7 @@ export function SignupForm() {
                 required
                 disabled={loading}
                 placeholder="John Doe"
-                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500"
+                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
               />
             </div>
           </div>
@@ -114,13 +113,13 @@ export function SignupForm() {
           <div>
             <label 
               htmlFor="email" 
-              className="mb-2 block text-sm font-medium text-slate-900"
+              className="mb-2 block text-sm font-medium text-slate-900 dark:text-slate-200"
             >
               Email Address
             </label>
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                <Mail className="h-5 w-5 text-slate-400" />
+                <Mail className="h-5 w-5 text-slate-400 dark:text-slate-500" />
               </div>
               <input
                 type="email"
@@ -129,7 +128,7 @@ export function SignupForm() {
                 required
                 disabled={loading}
                 placeholder="you@example.com"
-                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500"
+                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
               />
             </div>
           </div>
@@ -138,13 +137,13 @@ export function SignupForm() {
           <div>
             <label 
               htmlFor="password" 
-              className="mb-2 block text-sm font-medium text-slate-900"
+              className="mb-2 block text-sm font-medium text-slate-900 dark:text-slate-200"
             >
               Password
             </label>
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                <Lock className="h-5 w-5 text-slate-400" />
+                <Lock className="h-5 w-5 text-slate-400 dark:text-slate-500" />
               </div>
               <input
                 type="password"
@@ -154,10 +153,10 @@ export function SignupForm() {
                 minLength={8}
                 disabled={loading}
                 placeholder="••••••••"
-                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500"
+                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
               />
             </div>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
               Must be at least 8 characters
             </p>
           </div>
@@ -166,13 +165,13 @@ export function SignupForm() {
           <div>
             <label 
               htmlFor="confirmPassword" 
-              className="mb-2 block text-sm font-medium text-slate-900"
+              className="mb-2 block text-sm font-medium text-slate-900 dark:text-slate-200"
             >
               Confirm Password
             </label>
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                <Lock className="h-5 w-5 text-slate-400" />
+                <Lock className="h-5 w-5 text-slate-400 dark:text-slate-500" />
               </div>
               <input
                 type="password"
@@ -182,7 +181,7 @@ export function SignupForm() {
                 minLength={8}
                 disabled={loading}
                 placeholder="••••••••"
-                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500"
+                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
               />
             </div>
           </div>
@@ -191,7 +190,7 @@ export function SignupForm() {
           <button
             type="submit"
             disabled={loading}
-            className="group relative w-full cursor-pointer overflow-hidden rounded-lg bg-blue-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/50 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+            className="group relative w-full cursor-pointer overflow-hidden rounded-lg bg-blue-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/50 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
           >
             <span className="flex items-center justify-center gap-2">
               {loading ? (
@@ -226,11 +225,11 @@ export function SignupForm() {
 
         {/* Sign In Link */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Already have an account?{" "}
             <a 
               href="/" 
-              className="font-semibold text-blue-600 transition-colors hover:text-blue-700 focus:outline-none focus:underline"
+              className="font-semibold text-blue-600 transition-colors hover:text-blue-700 focus:outline-none focus:underline dark:text-blue-400 dark:hover:text-blue-300"
             >
               Sign in
             </a>
@@ -239,11 +238,11 @@ export function SignupForm() {
       </div>
 
       {/* Terms */}
-      <p className="mt-6 text-center text-xs text-slate-500">
+      <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
         By creating an account, you agree to our{" "}
-        <a href="#" className="underline hover:text-slate-700">Terms of Service</a>
+        <a href="#" className="underline hover:text-slate-700 dark:hover:text-slate-200">Terms of Service</a>
         {" "}and{" "}
-        <a href="#" className="underline hover:text-slate-700">Privacy Policy</a>
+        <a href="#" className="underline hover:text-slate-700 dark:hover:text-slate-200">Privacy Policy</a>
       </p>
     </div>
   );

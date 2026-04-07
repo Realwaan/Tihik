@@ -26,6 +26,64 @@ type SettlementPaymentRow = {
   updatedAt: Date;
 };
 
+type SettlementPaymentMeta = {
+  linkedAccount?: string;
+  linkedAccountType?: "DEBIT" | "CREDIT";
+};
+
+const SETTLEMENT_META_PREFIX = "[[trackit-meta]]";
+
+function serializeSettlementNote(
+  note: string | null | undefined,
+  meta?: SettlementPaymentMeta
+) {
+  const cleanNote = note?.trim() || "";
+  const linkedAccount = meta?.linkedAccount?.trim();
+
+  if (!linkedAccount) {
+    return cleanNote || null;
+  }
+
+  const payload = JSON.stringify({
+    linkedAccount,
+    linkedAccountType: meta?.linkedAccountType ?? "DEBIT",
+  });
+
+  return cleanNote
+    ? `${SETTLEMENT_META_PREFIX}${payload}\n${cleanNote}`
+    : `${SETTLEMENT_META_PREFIX}${payload}`;
+}
+
+function deserializeSettlementNote(rawNote: string | null) {
+  if (!rawNote || !rawNote.startsWith(SETTLEMENT_META_PREFIX)) {
+    return {
+      note: rawNote,
+      meta: {} as SettlementPaymentMeta,
+    };
+  }
+
+  const content = rawNote.slice(SETTLEMENT_META_PREFIX.length);
+  const separatorIndex = content.indexOf("\n");
+  const metaRaw = separatorIndex >= 0 ? content.slice(0, separatorIndex) : content;
+  const noteRaw = separatorIndex >= 0 ? content.slice(separatorIndex + 1) : "";
+
+  try {
+    const parsed = JSON.parse(metaRaw) as SettlementPaymentMeta;
+    return {
+      note: noteRaw.trim() || null,
+      meta: {
+        linkedAccount: parsed.linkedAccount?.trim(),
+        linkedAccountType: parsed.linkedAccountType,
+      },
+    };
+  } catch {
+    return {
+      note: rawNote,
+      meta: {} as SettlementPaymentMeta,
+    };
+  }
+}
+
 async function verifyMembersInHousehold(
   householdId: string,
   fromUserId: string,
@@ -84,7 +142,17 @@ export async function GET(request: NextRequest) {
         p.created_at DESC
     `;
 
-    return NextResponse.json({ data: payments }, { status: 200 });
+    const data = payments.map((payment) => {
+      const parsed = deserializeSettlementNote(payment.note);
+      return {
+        ...payment,
+        note: parsed.note,
+        linkedAccount: parsed.meta.linkedAccount ?? null,
+        linkedAccountType: parsed.meta.linkedAccountType ?? null,
+      };
+    });
+
+    return NextResponse.json({ data }, { status: 200 });
   } catch (error) {
     console.error("Failed to load settlement payments", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -136,6 +204,12 @@ export async function POST(request: NextRequest) {
     }
 
     const createdId = randomUUID();
+    const linkedAccount = parsed.data.linkedAccount?.trim() || null;
+    const linkedAccountType = parsed.data.linkedAccountType ?? "DEBIT";
+    const storedNote = serializeSettlementNote(parsed.data.note, {
+      linkedAccount: linkedAccount ?? undefined,
+      linkedAccountType,
+    });
 
     await prisma.$executeRaw`
       INSERT INTO collaboration_settlement_payment (
@@ -160,7 +234,7 @@ export async function POST(request: NextRequest) {
         ${parsed.data.amountUsd},
         'PENDING',
         ${parsed.data.dueDate},
-        ${parsed.data.note ?? null},
+        ${storedNote},
         NOW(),
         NOW()
       )
@@ -173,7 +247,9 @@ export async function POST(request: NextRequest) {
       action: "SETTLEMENT_TRACKED",
       entityType: "SettlementPayment",
       entityId: createdId,
-      details: `Tracked settlement of $${parsed.data.amountUsd.toFixed(2)} due ${parsed.data.dueDate.toISOString().slice(0, 10)}`,
+      details: `Tracked settlement of $${parsed.data.amountUsd.toFixed(2)} due ${parsed.data.dueDate.toISOString().slice(0, 10)}${
+        linkedAccount ? ` linked to ${linkedAccount} (${linkedAccountType.toLowerCase()})` : ""
+      }`,
     });
 
     return NextResponse.json({ data: { id: createdId } }, { status: 201 });

@@ -98,9 +98,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedData = {
+      ...parsed.data,
+      category:
+        parsed.data.type === "TRANSFER"
+          ? "Transfer"
+          : (parsed.data.category?.trim() ?? ""),
+      sourceAccount: parsed.data.sourceAccount?.trim() || null,
+      destinationAccount:
+        parsed.data.type === "TRANSFER"
+          ? parsed.data.destinationAccount?.trim() || null
+          : null,
+    };
+
     const transaction = await prisma.transaction.create({
       data: {
-        ...parsed.data,
+        ...normalizedData,
         userId: session.user.id,
       },
     });

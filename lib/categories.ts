@@ -63,6 +63,23 @@ export const PREMADE_CATEGORIES = Array.from(
   new Set([...PREMADE_EXPENSE_CATEGORIES, ...PREMADE_INCOME_CATEGORIES])
 ).sort((a, b) => a.localeCompare(b));
 
+export const CREDIT_ACCOUNT_TEMPLATES = [
+  "Visa Credit",
+  "Mastercard Credit",
+  "Amex Credit",
+] as const;
+
+export const ACCOUNT_TEMPLATE_CATEGORIES = [
+  ...PH_LOCAL_WALLET_CATEGORIES,
+  ...PH_BANK_WALLET_CATEGORIES,
+  ...CREDIT_ACCOUNT_TEMPLATES,
+  "Cash",
+] as const;
+
+export const ACCOUNT_CATEGORIES = [
+  ...ACCOUNT_TEMPLATE_CATEGORIES,
+] as const;
+
 type CategoryKind = "all" | "expense" | "income";
 
 export function getPremadeCategories(kind: CategoryKind = "all") {

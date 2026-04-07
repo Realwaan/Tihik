@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { deserializeRecurringNote, serializeRecurringNote } from "@/lib/recurring-note";
 import { recurringUpdateSchema } from "@/lib/validations/recurring";
 
 type RouteContext = {
@@ -58,16 +59,36 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
+    let nextNote: string | null | undefined;
+    if (parsed.data.note !== undefined || parsed.data.sourceAccount !== undefined) {
+      const existingTemplate = await prisma.recurringTransaction.findUnique({
+        where: { id },
+        select: { note: true },
+      });
+      const parsedExisting = deserializeRecurringNote(existingTemplate?.note ?? null);
+
+      const noteValue =
+        parsed.data.note !== undefined ? parsed.data.note : parsedExisting.note;
+      const sourceAccountValue =
+        parsed.data.sourceAccount !== undefined
+          ? parsed.data.sourceAccount
+          : parsedExisting.meta.sourceAccount;
+
+      nextNote = serializeRecurringNote(noteValue, {
+        sourceAccount: sourceAccountValue ?? undefined,
+      });
+    }
+
     const updated = await prisma.recurringTransaction.update({
       where: { id },
       data: {
-        ...(parsed.data.amount ? { amount: parsed.data.amount } : {}),
+        ...(parsed.data.amount !== undefined ? { amount: parsed.data.amount } : {}),
         ...(parsed.data.currency ? { currency: parsed.data.currency } : {}),
         ...(parsed.data.type ? { type: parsed.data.type } : {}),
         ...(parsed.data.category ? { category: parsed.data.category } : {}),
-        ...(parsed.data.note !== undefined ? { note: parsed.data.note } : {}),
+        ...(nextNote !== undefined ? { note: nextNote } : {}),
         ...(parsed.data.frequency ? { frequency: parsed.data.frequency } : {}),
-        ...(parsed.data.interval ? { interval: parsed.data.interval } : {}),
+        ...(parsed.data.interval !== undefined ? { interval: parsed.data.interval } : {}),
         ...(parsed.data.startDate ? { startDate: parsed.data.startDate } : {}),
         ...(parsed.data.endDate !== undefined
           ? { endDate: parsed.data.endDate }

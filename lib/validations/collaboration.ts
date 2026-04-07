@@ -41,6 +41,8 @@ export const settlementPaymentCreateSchema = z.object({
     .positive("Amount must be greater than 0"),
   dueDate: z.coerce.date({ invalid_type_error: "Due date must be valid" }),
   note: z.string().trim().max(300).optional().nullable(),
+  linkedAccount: z.string().trim().max(100).optional().nullable(),
+  linkedAccountType: z.enum(["DEBIT", "CREDIT"]).optional().nullable(),
 });
 
 export const settlementPaymentActionSchema = z.object({

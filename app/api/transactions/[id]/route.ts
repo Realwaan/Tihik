@@ -56,11 +56,65 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       );
     }
 
+    const normalizedData: {
+      amount?: number;
+      currency?: "USD" | "EUR" | "GBP" | "JPY" | "CAD" | "AUD" | "PHP";
+      type?: "INCOME" | "EXPENSE" | "TRANSFER";
+      category?: string;
+      sourceAccount?: string | null;
+      destinationAccount?: string | null;
+      note?: string | null;
+      date?: Date;
+    } = {};
+
+    if (parsed.data.amount !== undefined) {
+      normalizedData.amount = parsed.data.amount;
+    }
+
+    if (parsed.data.currency !== undefined) {
+      normalizedData.currency = parsed.data.currency;
+    }
+
+    if (parsed.data.note !== undefined) {
+      normalizedData.note = parsed.data.note;
+    }
+
+    if (parsed.data.date !== undefined) {
+      normalizedData.date = parsed.data.date;
+    }
+
+    if (parsed.data.sourceAccount !== undefined) {
+      normalizedData.sourceAccount = parsed.data.sourceAccount?.trim() || null;
+    }
+
+    if (parsed.data.type !== undefined) {
+      normalizedData.type = parsed.data.type;
+      if (parsed.data.type === "TRANSFER") {
+        normalizedData.category = "Transfer";
+        normalizedData.destinationAccount =
+          parsed.data.destinationAccount?.trim() || null;
+      } else {
+        normalizedData.destinationAccount = null;
+      }
+    }
+
+    if (parsed.data.category !== undefined && parsed.data.type !== "TRANSFER") {
+      normalizedData.category = parsed.data.category?.trim() || "";
+    }
+
+    if (
+      parsed.data.destinationAccount !== undefined &&
+      parsed.data.type === "TRANSFER"
+    ) {
+      normalizedData.destinationAccount =
+        parsed.data.destinationAccount?.trim() || null;
+    }
+
     const updated = await prisma.transaction.update({
       where: {
         id: transactionId,
       },
-      data: parsed.data,
+      data: normalizedData,
     });
 
     return NextResponse.json({ data: updated }, { status: 200 });

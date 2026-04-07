@@ -14,9 +14,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const note = (searchParams.get("note") ?? "").trim();
     const typeParam = searchParams.get("type");
-    const type = typeParam === "INCOME" ? "INCOME" : "EXPENSE";
+    const type =
+      typeParam === "INCOME" || typeParam === "TRANSFER" ? typeParam : "EXPENSE";
 
-    if (!note) {
+    if (!note || type === "TRANSFER") {
       return NextResponse.json({ data: { category: null } }, { status: 200 });
     }
 

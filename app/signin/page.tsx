@@ -153,7 +153,7 @@ function SignInForm() {
       : null;
 
   return (
-    <div className="page-shell flex min-h-screen items-center justify-center bg-gradient-to-br from-white via-slate-50 to-slate-100 px-4 py-6 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:py-12">
+    <div className="page-shell auth-surface flex min-h-screen items-center justify-center px-4 py-6 sm:py-12">
       <div className="w-full max-w-md px-1 sm:px-0">
         <Card className="rounded-3xl border-slate-200 bg-white/95 dark:border-slate-800 dark:bg-slate-900/95">
           <CardHeader className="text-center">

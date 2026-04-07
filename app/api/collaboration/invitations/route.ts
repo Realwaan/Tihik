@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { writeCollaborationAuditEvent } from "@/lib/collaboration-audit";
-import { isUserEmailVerified, userHasHouseholdAccess } from "@/lib/collaboration";
+import {
+  getUserEmailVerificationStatus,
+  userHasHouseholdAccess,
+} from "@/lib/collaboration";
 import { prisma } from "@/lib/prisma";
 import { householdInviteSchema } from "@/lib/validations/collaboration";
 
@@ -13,10 +16,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const verified = await isUserEmailVerified(session.user.id);
-    if (!verified) {
+    const verificationStatus = await getUserEmailVerificationStatus(session.user.id);
+    if (verificationStatus === "MISSING") {
       return NextResponse.json(
-        { error: "Please verify your email before inviting members." },
+        {
+          error: "Session user was not found. Please sign in again.",
+          code: "SESSION_STALE",
+        },
+        { status: 401 }
+      );
+    }
+
+    if (verificationStatus === "UNVERIFIED") {
+      return NextResponse.json(
+        {
+          error: "Please verify your email before inviting members.",
+          code: "EMAIL_NOT_VERIFIED",
+        },
         { status: 403 }
       );
     }

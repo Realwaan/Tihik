@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { writeCollaborationAuditEvent } from "@/lib/collaboration-audit";
-import { isUserEmailVerified } from "@/lib/collaboration";
+import { getUserEmailVerificationStatus } from "@/lib/collaboration";
 import { prisma } from "@/lib/prisma";
 import { householdCreateSchema } from "@/lib/validations/collaboration";
 
@@ -13,10 +13,23 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const verified = await isUserEmailVerified(session.user.id);
-    if (!verified) {
+    const verificationStatus = await getUserEmailVerificationStatus(session.user.id);
+    if (verificationStatus === "MISSING") {
       return NextResponse.json(
-        { error: "Please verify your email before creating collaboration groups." },
+        {
+          error: "Session user was not found. Please sign in again.",
+          code: "SESSION_STALE",
+        },
+        { status: 401 }
+      );
+    }
+
+    if (verificationStatus === "UNVERIFIED") {
+      return NextResponse.json(
+        {
+          error: "Please verify your email before creating collaboration groups.",
+          code: "EMAIL_NOT_VERIFIED",
+        },
         { status: 403 }
       );
     }

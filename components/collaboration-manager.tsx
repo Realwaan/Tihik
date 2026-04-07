@@ -1,12 +1,17 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { Loader2, Plus, RefreshCcw, Trash2, Users } from "lucide-react";
 import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { Button } from "@/components/ui/button";
 import { CategoryCombobox } from "@/components/ui/category-combobox";
 import { WalletCategoryBadge } from "@/components/ui/wallet-category-badge";
+import {
+  ACCOUNT_TEMPLATE_CATEGORIES,
+} from "@/lib/categories";
 import { mergeCategories } from "@/lib/categories";
 
 type Household = {
@@ -88,6 +93,8 @@ type SettlementPayment = {
   reminderCount: number;
   paidAt: string | null;
   note?: string | null;
+  linkedAccount?: string | null;
+  linkedAccountType?: "DEBIT" | "CREDIT" | null;
 };
 
 type CollaborationAuditEvent = {
@@ -102,7 +109,13 @@ type CollaborationAuditEvent = {
   createdAt: string;
 };
 
+type ApiErrorPayload = {
+  error?: string;
+  code?: string;
+};
+
 export function CollaborationManager() {
+  const router = useRouter();
   const { showToast } = useToast();
   const [households, setHouseholds] = useState<Household[]>([]);
   const [expenses, setExpenses] = useState<SharedExpense[]>([]);
@@ -131,21 +144,60 @@ export function CollaborationManager() {
   const [settlementPayments, setSettlementPayments] = useState<SettlementPayment[]>([]);
   const [trackingPaymentKey, setTrackingPaymentKey] = useState<string | null>(null);
   const [updatingPaymentId, setUpdatingPaymentId] = useState<string | null>(null);
+  const [settlementLinkedAccount, setSettlementLinkedAccount] = useState("");
+  const [settlementLinkedAccountType, setSettlementLinkedAccountType] =
+    useState<"DEBIT" | "CREDIT">("DEBIT");
   const [auditEvents, setAuditEvents] = useState<CollaborationAuditEvent[]>([]);
+  const sessionRedirectingRef = useRef(false);
+
+  async function handleSessionExpired() {
+    if (sessionRedirectingRef.current) {
+      return;
+    }
+
+    sessionRedirectingRef.current = true;
+    await signOut({ redirect: false });
+    showToast("error", "Session expired after database reset. Please sign in again.");
+    router.replace("/signin");
+  }
 
   async function loadHouseholds() {
+    if (sessionRedirectingRef.current) {
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await fetch("/api/collaboration/households");
-      if (!response.ok) throw new Error("Failed");
+      if (!response.ok) {
+        const json = (await response.json().catch(() => null)) as ApiErrorPayload | null;
+        const message = json?.error || "Failed to load collaboration groups.";
+
+        if (response.status === 401 || json?.code === "SESSION_STALE") {
+          await handleSessionExpired();
+          setHouseholds([]);
+          setSelectedHouseholdId("");
+          setExpenses([]);
+          setSettlement(null);
+          setSettlementPayments([]);
+          setAuditEvents([]);
+          return;
+        }
+
+        throw new Error(message);
+      }
+
       const json = await response.json();
       const data = (json.data ?? []) as Household[];
       setHouseholds(data);
       if (!selectedHouseholdId && data[0]?.household?.id) {
         setSelectedHouseholdId(data[0].household.id);
       }
-    } catch {
-      showToast("error", "Failed to load collaboration groups.");
+    } catch (error) {
+      showToast(
+        "error",
+        error instanceof Error ? error.message : "Failed to load collaboration groups."
+      );
     } finally {
       setLoading(false);
     }
@@ -263,6 +315,14 @@ export function CollaborationManager() {
   const selectedHousehold = useMemo(
     () => households.find((item) => item.household.id === selectedHouseholdId),
     [households, selectedHouseholdId]
+  );
+
+  const settlementAccountOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([...ACCOUNT_TEMPLATE_CATEGORIES])
+      ).sort((a, b) => a.localeCompare(b)),
+    []
   );
 
   async function createHousehold(event: FormEvent) {
@@ -459,6 +519,10 @@ export function CollaborationManager() {
           amountUsd: suggestion.amountUsd,
           dueDate: dueDate.toISOString(),
           note: `Settlement from suggested balance between ${suggestion.fromName} and ${suggestion.toName}`,
+          linkedAccount: settlementLinkedAccount.trim() || null,
+          linkedAccountType: settlementLinkedAccount.trim()
+            ? settlementLinkedAccountType
+            : null,
         }),
       });
 
@@ -520,7 +584,7 @@ export function CollaborationManager() {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/90 sm:p-6">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
           Collaboration groups
         </h2>
@@ -569,7 +633,7 @@ export function CollaborationManager() {
                   className={`rounded-2xl border px-3 py-3 transition ${
                     selectedHouseholdId === item.household.id
                       ? "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20"
-                      : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+                      : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900/80"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -610,7 +674,7 @@ export function CollaborationManager() {
             type="button"
             onClick={refreshCollaborationData}
             disabled={refreshing}
-            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 sm:w-auto"
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:w-auto"
           >
             {refreshing ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -622,7 +686,7 @@ export function CollaborationManager() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/90 sm:p-6">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-amber-600" />
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -661,7 +725,7 @@ export function CollaborationManager() {
                 {selectedHousehold.household.members.map((member) => (
                   <span
                     key={member.id}
-                    className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 dark:border-slate-700 dark:bg-slate-800"
+                    className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 dark:border-slate-700 dark:bg-slate-900/80"
                   >
                     {member.user.name || member.user.email || "User"} ({member.role})
                   </span>
@@ -795,6 +859,29 @@ export function CollaborationManager() {
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 Settlement suggestions ({preferredCurrency})
               </h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <CategoryCombobox
+                  value={settlementLinkedAccount}
+                  onChange={setSettlementLinkedAccount}
+                  options={settlementAccountOptions}
+                  placeholder="Optional linked account"
+                />
+                <select
+                  value={settlementLinkedAccountType}
+                  onChange={(event) =>
+                    setSettlementLinkedAccountType(
+                      event.target.value as "DEBIT" | "CREDIT"
+                    )
+                  }
+                  className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm outline-none transition focus:border-amber-400 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                >
+                  <option value="DEBIT">Debit account</option>
+                  <option value="CREDIT">Credit account</option>
+                </select>
+              </div>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                Link owed-to-you settlements to a debit or credit account so collections reflect account history accurately.
+              </p>
               {settlement && settlement.suggestions.length > 0 ? (
                 <div className="mt-3 space-y-2">
                   {settlement.suggestions.map((item, idx) => (
@@ -867,6 +954,14 @@ export function CollaborationManager() {
                             {payment.note ? (
                               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                 {payment.note}
+                              </p>
+                            ) : null}
+                            {payment.linkedAccount ? (
+                              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                Linked account: {payment.linkedAccount}
+                                {payment.linkedAccountType
+                                  ? ` (${payment.linkedAccountType.toLowerCase()})`
+                                  : ""}
                               </p>
                             ) : null}
                           </div>

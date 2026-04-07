@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { deserializeRecurringNote, serializeRecurringNote } from "@/lib/recurring-note";
 import { runRecurringGenerationForUser } from "@/lib/recurring";
 import { recurringCreateSchema } from "@/lib/validations/recurring";
 
@@ -24,7 +25,16 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({ data }, { status: 200 });
+    const parsedData = data.map((item) => {
+      const parsed = deserializeRecurringNote(item.note);
+      return {
+        ...item,
+        note: parsed.note,
+        sourceAccount: parsed.meta.sourceAccount ?? null,
+      };
+    });
+
+    return NextResponse.json({ data: parsedData }, { status: 200 });
   } catch (error) {
     console.error("Failed to fetch recurring transactions", error);
     return NextResponse.json(
@@ -63,6 +73,9 @@ export async function POST(request: NextRequest) {
       startDate.getMonth(),
       startDate.getDate()
     );
+    const storedNote = serializeRecurringNote(parsed.data.note, {
+      sourceAccount: parsed.data.sourceAccount ?? undefined,
+    });
 
     const recurring = await prisma.recurringTransaction.create({
       data: {
@@ -71,7 +84,7 @@ export async function POST(request: NextRequest) {
         currency: parsed.data.currency,
         type: parsed.data.type,
         category: parsed.data.category,
-        note: parsed.data.note,
+        note: storedNote,
         frequency: parsed.data.frequency,
         interval: parsed.data.interval,
         startDate: nextRunDate,

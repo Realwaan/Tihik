@@ -28,5 +28,25 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "maskable",
       },
     ],
+    shortcuts: [
+      {
+        name: "Add transaction",
+        short_name: "Add",
+        description: "Quickly log a new transaction",
+        url: "/transactions",
+      },
+      {
+        name: "Open plan",
+        short_name: "Plan",
+        description: "Review planning and budget actions",
+        url: "/plan",
+      },
+      {
+        name: "Account overview",
+        short_name: "Accounts",
+        description: "See account balances and activity",
+        url: "/account-overview",
+      },
+    ],
   };
 }

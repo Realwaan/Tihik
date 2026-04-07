@@ -8,7 +8,10 @@ import { getWalletBadge } from "@/lib/wallet-badges";
 const TRANSACTION_TYPE = {
   INCOME: "INCOME",
   EXPENSE: "EXPENSE",
+  TRANSFER: "TRANSFER",
 } as const;
+
+const TRANSFER_CATEGORY = "Transfer";
 
 export async function GET() {
   try {
@@ -22,7 +25,7 @@ export async function GET() {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    const [incomeAgg, expenseAgg, expenseRows, budgets, walletRows] = await Promise.all([
+    const [incomeAgg, expenseAgg, expenseRows, budgets] = await Promise.all([
       prisma.transaction.aggregate({
         where: {
           userId: session.user.id,
@@ -40,6 +43,9 @@ export async function GET() {
         where: {
           userId: session.user.id,
           type: TRANSACTION_TYPE.EXPENSE,
+          category: {
+            not: TRANSFER_CATEGORY,
+          },
           date: {
             gte: monthStart,
             lt: nextMonthStart,
@@ -54,6 +60,9 @@ export async function GET() {
         where: {
           userId: session.user.id,
           type: TRANSACTION_TYPE.EXPENSE,
+          category: {
+            not: TRANSFER_CATEGORY,
+          },
           date: {
             gte: monthStart,
             lt: nextMonthStart,
@@ -69,20 +78,20 @@ export async function GET() {
           month: monthStart,
         },
       }),
-      prisma.transaction.groupBy({
-        by: ["category", "type"],
-        where: {
-          userId: session.user.id,
-          date: {
-            gte: monthStart,
-            lt: nextMonthStart,
-          },
-        },
-        _sum: {
-          amount: true,
-        },
-      }),
     ]);
+
+    const walletRows = await prisma.transaction.findMany({
+      where: {
+        userId: session.user.id,
+      },
+      select: {
+        amount: true,
+        type: true,
+        category: true,
+        sourceAccount: true,
+        destinationAccount: true,
+      },
+    });
 
     const totalIncome = incomeAgg._sum.amount ?? 0;
     const totalExpenses = expenseAgg._sum.amount ?? 0;
@@ -146,41 +155,54 @@ export async function GET() {
     let bankBalance = 0;
     let otherBalance = 0;
 
-    for (const row of walletRows) {
-      const amount = row._sum.amount ?? 0;
-      if (!amount) continue;
+    const applySignedAmount = (accountName: string | null | undefined, signedAmount: number) => {
+      const account = accountName?.trim();
+      if (!account || !signedAmount) return;
 
-      const direction = row.type === TRANSACTION_TYPE.INCOME ? 1 : -1;
-      const signedAmount = amount * direction;
-      const badge = getWalletBadge(row.category);
+      const badge = getWalletBadge(account);
 
       if (badge?.kind === "wallet") {
         ewalletBalance += signedAmount;
         walletBreakdownMap.set(
-          row.category,
-          (walletBreakdownMap.get(row.category) ?? 0) + signedAmount
+          account,
+          (walletBreakdownMap.get(account) ?? 0) + signedAmount
         );
-        continue;
+        return;
       }
 
       if (badge?.kind === "bank") {
         bankBalance += signedAmount;
         bankBreakdownMap.set(
-          row.category,
-          (bankBreakdownMap.get(row.category) ?? 0) + signedAmount
+          account,
+          (bankBreakdownMap.get(account) ?? 0) + signedAmount
         );
+        return;
+      }
+
+      if (account.toLowerCase().includes("cash")) {
+        cashBalance += signedAmount;
+        return;
+      }
+
+      otherBalance += signedAmount;
+      uncategorizedMap.set(
+        account,
+        (uncategorizedMap.get(account) ?? 0) + signedAmount
+      );
+    };
+
+    for (const row of walletRows) {
+      const amount = row.amount ?? 0;
+      if (!amount) continue;
+
+      if (row.type === TRANSACTION_TYPE.TRANSFER) {
+        applySignedAmount(row.sourceAccount || row.category, -amount);
+        applySignedAmount(row.destinationAccount, amount);
         continue;
       }
 
-      if (row.category.trim().toLowerCase().includes("cash")) {
-        cashBalance += signedAmount;
-      } else {
-        otherBalance += signedAmount;
-        uncategorizedMap.set(
-          row.category,
-          (uncategorizedMap.get(row.category) ?? 0) + signedAmount
-        );
-      }
+      const direction = row.type === TRANSACTION_TYPE.INCOME ? 1 : -1;
+      applySignedAmount(row.sourceAccount || row.category, amount * direction);
     }
 
     const ewallets = Array.from(walletBreakdownMap.entries())
@@ -215,6 +237,9 @@ export async function GET() {
             where: {
               userId: session.user.id,
               type: TRANSACTION_TYPE.EXPENSE,
+              category: {
+                not: TRANSFER_CATEGORY,
+              },
               date: {
                 gte: range.start,
                 lt: range.end,

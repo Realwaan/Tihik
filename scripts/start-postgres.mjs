@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 
 const windowsServices = [
   'postgresql-x64-16',
@@ -16,6 +17,39 @@ const linuxServices = [
 
 function run(command, args) {
   return execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
+function readDatabaseUrlFromEnvFiles() {
+  const candidates = ['.env.local', '.env'];
+
+  for (const file of candidates) {
+    if (!existsSync(file)) continue;
+
+    const lines = readFileSync(file, 'utf8').split(/\r?\n/);
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+
+      const match = line.match(/^DATABASE_URL\s*=\s*(.*)$/);
+      if (!match) continue;
+
+      const value = match[1].trim().replace(/^['"]|['"]$/g, '');
+      if (value) return value;
+    }
+  }
+
+  return null;
+}
+
+function isLocalDatabaseUrl(databaseUrl) {
+  if (!databaseUrl) return true;
+
+  try {
+    const parsed = new URL(databaseUrl);
+    return ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
+  } catch {
+    return true;
+  }
 }
 
 function isWindowsServiceRunning(serviceName) {
@@ -90,6 +124,13 @@ function ensureLinuxPostgres() {
 }
 
 try {
+  const databaseUrl = process.env.DATABASE_URL ?? readDatabaseUrlFromEnvFiles();
+
+  if (!isLocalDatabaseUrl(databaseUrl)) {
+    console.log('[postgres] Remote DATABASE_URL detected; skipping local PostgreSQL service start.');
+    process.exit(0);
+  }
+
   if (process.platform === 'win32') {
     ensureWindowsPostgres();
   } else if (process.platform === 'linux') {

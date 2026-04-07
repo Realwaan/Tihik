@@ -4,6 +4,7 @@ import { AiAssistantWidget } from "@/components/ai-assistant-widget";
 import { ToastProvider } from "@/components/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PwaRegister } from "@/components/pwa-register";
+import { KeyboardFocusAssist } from "@/components/keyboard-focus-assist";
 
 export const viewport = {
   width: "device-width",
@@ -44,6 +45,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ToastProvider>
             <PwaRegister />
+            <KeyboardFocusAssist />
             {children}
             <AiAssistantWidget />
           </ToastProvider>

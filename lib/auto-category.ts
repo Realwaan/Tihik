@@ -1,4 +1,4 @@
-type TransactionType = "INCOME" | "EXPENSE";
+type TransactionType = "INCOME" | "EXPENSE" | "TRANSFER";
 
 type HistoryItem = {
   note: string;
@@ -31,6 +31,10 @@ function normalize(input: string) {
 }
 
 function fromKeywords(note: string, type: TransactionType): string | null {
+  if (type === "TRANSFER") {
+    return null;
+  }
+
   const rules = type === "INCOME" ? INCOME_KEYWORDS : EXPENSE_KEYWORDS;
   const matched = rules.find((rule) => rule.keyword.test(note));
   return matched ? matched.category : null;

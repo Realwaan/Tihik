@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { deserializeRecurringNote } from "@/lib/recurring-note";
 
 type Frequency = "DAILY" | "WEEKLY" | "MONTHLY";
 
@@ -44,6 +45,7 @@ export async function runRecurringGenerationForUser(userId: string) {
   });
 
   for (const template of templates) {
+    const parsedTemplateNote = deserializeRecurringNote(template.note);
     let cursor = normalizeDate(template.nextRunDate);
     const maxRuns = 36;
     let runs = 0;
@@ -66,7 +68,8 @@ export async function runRecurringGenerationForUser(userId: string) {
           currency: template.currency,
           type: template.type,
           category: template.category,
-          note: template.note,
+          sourceAccount: parsedTemplateNote.meta.sourceAccount ?? null,
+          note: parsedTemplateNote.note,
           date: cursor,
           sourceRecurringId: template.id,
           recurrenceOccurrence: cursor,

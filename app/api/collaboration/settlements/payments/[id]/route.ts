@@ -18,7 +18,46 @@ type PaymentAccessRow = {
   fromUserId: string;
   toUserId: string;
   status: "PENDING" | "PAID";
+  amountUsd: number;
+  note: string | null;
 };
+
+type SettlementPaymentMeta = {
+  linkedAccount?: string;
+  linkedAccountType?: "DEBIT" | "CREDIT";
+};
+
+const SETTLEMENT_META_PREFIX = "[[trackit-meta]]";
+
+function deserializeSettlementNote(rawNote: string | null) {
+  if (!rawNote || !rawNote.startsWith(SETTLEMENT_META_PREFIX)) {
+    return {
+      note: rawNote,
+      meta: {} as SettlementPaymentMeta,
+    };
+  }
+
+  const content = rawNote.slice(SETTLEMENT_META_PREFIX.length);
+  const separatorIndex = content.indexOf("\n");
+  const metaRaw = separatorIndex >= 0 ? content.slice(0, separatorIndex) : content;
+  const noteRaw = separatorIndex >= 0 ? content.slice(separatorIndex + 1) : "";
+
+  try {
+    const parsed = JSON.parse(metaRaw) as SettlementPaymentMeta;
+    return {
+      note: noteRaw.trim() || null,
+      meta: {
+        linkedAccount: parsed.linkedAccount?.trim(),
+        linkedAccountType: parsed.linkedAccountType,
+      },
+    };
+  } catch {
+    return {
+      note: rawNote,
+      meta: {} as SettlementPaymentMeta,
+    };
+  }
+}
 
 async function getPaymentForAccess(id: string) {
   const rows = await prisma.$queryRaw<PaymentAccessRow[]>`
@@ -27,7 +66,9 @@ async function getPaymentForAccess(id: string) {
       p.household_id AS "householdId",
       p.from_user_id AS "fromUserId",
       p.to_user_id AS "toUserId",
-      p.status AS "status"
+      p.status AS "status",
+      p.amount_usd AS "amountUsd",
+      p.note AS "note"
     FROM collaboration_settlement_payment p
     WHERE p.id = ${id}
     LIMIT 1
@@ -101,14 +142,70 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (parsed.data.action === "MARK_PAID") {
-      await prisma.$executeRaw`
-        UPDATE collaboration_settlement_payment
-        SET
-          status = 'PAID',
-          paid_at = NOW(),
-          updated_at = NOW()
-        WHERE id = ${id}
-      `;
+      const debtPaymentNote = `Settlement Payment ${payment.id} - Debt Payment`;
+      const collectionReceivedNote =
+        `Settlement Payment ${payment.id} - Collection Received`;
+      const linkedMeta = deserializeSettlementNote(payment.note).meta;
+
+      await prisma.$transaction(async (transaction) => {
+        await transaction.$executeRaw`
+          UPDATE collaboration_settlement_payment
+          SET
+            status = 'PAID',
+            paid_at = NOW(),
+            updated_at = NOW()
+          WHERE id = ${id}
+        `;
+
+        const existingDebtPayment = await transaction.transaction.findFirst({
+          where: {
+            userId: payment.fromUserId,
+            type: "EXPENSE",
+            category: "Debt Payment",
+            note: debtPaymentNote,
+          },
+          select: { id: true },
+        });
+
+        if (!existingDebtPayment) {
+          await transaction.transaction.create({
+            data: {
+              userId: payment.fromUserId,
+              amount: payment.amountUsd,
+              currency: "USD",
+              type: "EXPENSE",
+              category: "Debt Payment",
+              note: debtPaymentNote,
+              date: new Date(),
+            },
+          });
+        }
+
+        const existingCollection = await transaction.transaction.findFirst({
+          where: {
+            userId: payment.toUserId,
+            type: "INCOME",
+            category: "Collection Received",
+            note: collectionReceivedNote,
+          },
+          select: { id: true },
+        });
+
+        if (!existingCollection) {
+          await transaction.transaction.create({
+            data: {
+              userId: payment.toUserId,
+              amount: payment.amountUsd,
+              currency: "USD",
+              type: "INCOME",
+              category: "Collection Received",
+              sourceAccount: linkedMeta.linkedAccount || null,
+              note: collectionReceivedNote,
+              date: new Date(),
+            },
+          });
+        }
+      });
 
       await writeCollaborationAuditEvent({
         householdId: payment.householdId,
@@ -123,14 +220,31 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ success: true }, { status: 200 });
     }
 
-    await prisma.$executeRaw`
-      UPDATE collaboration_settlement_payment
-      SET
-        status = 'PENDING',
-        paid_at = NULL,
-        updated_at = NOW()
-      WHERE id = ${id}
-    `;
+    const debtPaymentNote = `Settlement Payment ${payment.id} - Debt Payment`;
+    const collectionReceivedNote =
+      `Settlement Payment ${payment.id} - Collection Received`;
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`
+        UPDATE collaboration_settlement_payment
+        SET
+          status = 'PENDING',
+          paid_at = NULL,
+          updated_at = NOW()
+        WHERE id = ${id}
+      `;
+
+      await transaction.transaction.deleteMany({
+        where: {
+          userId: {
+            in: [payment.fromUserId, payment.toUserId],
+          },
+          note: {
+            in: [debtPaymentNote, collectionReceivedNote],
+          },
+        },
+      });
+    });
 
     await writeCollaborationAuditEvent({
       householdId: payment.householdId,

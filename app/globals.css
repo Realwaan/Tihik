@@ -45,6 +45,17 @@
   * {
     box-sizing: border-box;
   }
+
+  input,
+  textarea,
+  select {
+    scroll-margin-bottom: calc(env(safe-area-inset-bottom) + 12rem);
+  }
+
+  input[type="date"] {
+    scroll-margin-top: 6rem;
+    scroll-margin-bottom: calc(env(safe-area-inset-bottom) + 14rem);
+  }
 }
 
 @layer components {
@@ -87,6 +98,38 @@
       radial-gradient(circle at 20% 20%, rgba(251, 191, 36, 0.16), transparent 30%),
       radial-gradient(circle at 80% 10%, rgba(59, 130, 246, 0.14), transparent 26%),
       radial-gradient(circle at 50% 85%, rgba(16, 185, 129, 0.08), transparent 24%);
+  }
+
+  .app-surface {
+    @apply bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
+    background-image: linear-gradient(
+      180deg,
+      rgba(248, 250, 252, 0.96) 0%,
+      rgba(241, 245, 249, 0.94) 100%
+    );
+  }
+
+  html.dark .app-surface {
+    background-image: linear-gradient(
+      180deg,
+      rgba(2, 6, 23, 0.98) 0%,
+      rgba(15, 23, 42, 0.96) 100%
+    );
+  }
+
+  .auth-surface {
+    @apply bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
+    background-image:
+      radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 34%),
+      radial-gradient(circle at top right, rgba(251, 191, 36, 0.12), transparent 30%),
+      linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(241, 245, 249, 0.96) 100%);
+  }
+
+  html.dark .auth-surface {
+    background-image:
+      radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 34%),
+      radial-gradient(circle at top right, rgba(251, 191, 36, 0.14), transparent 30%),
+      linear-gradient(180deg, rgba(2, 6, 23, 0.98) 0%, rgba(15, 23, 42, 0.96) 100%);
   }
 
   .card-lift {
