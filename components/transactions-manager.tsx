@@ -61,7 +61,7 @@ const accountOptions = Array.from(
   new Set([...ACCOUNT_TEMPLATE_CATEGORIES])
 ).sort((a, b) => a.localeCompare(b));
 
-const MAX_VISIBLE_TRANSACTIONS = 250;
+const TRANSACTIONS_PER_PAGE = 10;
 
 export function TransactionsManager() {
   const { showToast } = useToast();
@@ -73,6 +73,7 @@ export function TransactionsManager() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"ALL" | TransactionType>("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
   const [preferredCurrency, setPreferredCurrency] =
     useState<TransactionFormState["currency"]>("USD");
   const [allCategories, setAllCategories] = useState<string[]>([]);
@@ -751,10 +752,38 @@ export function TransactionsManager() {
     });
   }, [transactions, searchQuery, filterType]);
 
-  const visibleTransactions = useMemo(
-    () => filteredTransactions.slice(0, MAX_VISIBLE_TRANSACTIONS),
-    [filteredTransactions]
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredTransactions.length / TRANSACTIONS_PER_PAGE)
   );
+
+  const pagedTransactions = useMemo(() => {
+    const start = (currentPage - 1) * TRANSACTIONS_PER_PAGE;
+    return filteredTransactions.slice(start, start + TRANSACTIONS_PER_PAGE);
+  }, [filteredTransactions, currentPage]);
+
+  const pageStartIndex =
+    filteredTransactions.length === 0
+      ? 0
+      : (currentPage - 1) * TRANSACTIONS_PER_PAGE + 1;
+  const pageEndIndex =
+    filteredTransactions.length === 0
+      ? 0
+      : Math.min(currentPage * TRANSACTIONS_PER_PAGE, filteredTransactions.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterType]);
+
+  useEffect(() => {
+    setCurrentPage((previous) => {
+      if (filteredTransactions.length === 0) {
+        return 1;
+      }
+
+      return Math.min(previous, totalPages);
+    });
+  }, [filteredTransactions.length, totalPages]);
 
   useEffect(() => {
     if (!selectedTransaction) {
@@ -1177,7 +1206,7 @@ export function TransactionsManager() {
             </div>
           ) : (
             <div className="space-y-3">
-              {visibleTransactions.map((transaction) => (
+              {pagedTransactions.map((transaction) => (
                 <article
                   key={transaction.id}
                   role="button"
@@ -1257,10 +1286,41 @@ export function TransactionsManager() {
                   </div>
                 </article>
               ))}
-              {filteredTransactions.length > visibleTransactions.length ? (
-                <p className="pt-1 text-center text-xs text-slate-500 dark:text-slate-400">
-                  Showing {visibleTransactions.length} of {filteredTransactions.length} transactions for smoother rendering.
-                </p>
+              {filteredTransactions.length > 0 ? (
+                <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-center text-xs text-slate-500 dark:text-slate-400 sm:text-left">
+                    Showing {pageStartIndex}-{pageEndIndex} of {filteredTransactions.length} transactions.
+                  </p>
+                  {totalPages > 1 ? (
+                    <div className="inline-flex items-center justify-center gap-2 self-center sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCurrentPage((previous) => Math.max(1, previous - 1))
+                        }
+                        disabled={currentPage === 1}
+                        className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCurrentPage((previous) =>
+                            Math.min(totalPages, previous + 1)
+                          )
+                        }
+                        disabled={currentPage === totalPages}
+                        className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           )}
