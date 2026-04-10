@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 import { AiAssistantWidget } from "@/components/ai-assistant-widget";
 import { ToastProvider } from "@/components/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -50,6 +51,7 @@ export default function RootLayout({
             <AiAssistantWidget />
           </ToastProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
