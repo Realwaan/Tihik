@@ -86,6 +86,18 @@ const LOGO_OVERRIDES_BY_CODE: Record<string, LogoOverride> = {
     officialLogoPath: "/logos/wallets/diskartech.svg",
     officialLogoUrl: "https://logo.clearbit.com/diskartech.ph",
   },
+  BA: {
+    logoText: "B",
+    logoGradientClass: "from-[#0ea5e9] to-[#0f766e]",
+    officialLogoPath: "/logos/wallets/bayad-app.svg",
+    officialLogoUrl: "https://logo.clearbit.com/bayad.com",
+  },
+  MBK: {
+    logoText: "M",
+    logoGradientClass: "from-[#f8fafc] to-[#cbd5e1]",
+    officialLogoPath: "/logos/wallets/maribank.svg",
+    officialLogoUrl: "https://logo.clearbit.com/maribank.ph",
+  },
   BPI: {
     logoText: "B",
     logoGradientClass: "from-[#c1121f] to-[#8f0f18]",
@@ -170,6 +182,66 @@ const LOGO_OVERRIDES_BY_CODE: Record<string, LogoOverride> = {
     officialLogoPath: "/logos/banks/komo.svg",
     officialLogoUrl: "https://logo.clearbit.com/komo.ph",
   },
+  PSB: {
+    logoText: "P",
+    logoGradientClass: "from-[#dc2626] to-[#991b1b]",
+    officialLogoPath: "/logos/banks/psbank.svg",
+    officialLogoUrl: "https://logo.clearbit.com/psbank.com.ph",
+  },
+  DBP: {
+    logoText: "D",
+    logoGradientClass: "from-[#1d4ed8] to-[#0f766e]",
+    officialLogoPath: "/logos/banks/dbp.svg",
+    officialLogoUrl: "https://logo.clearbit.com/dbp.ph",
+  },
+  AUB: {
+    logoText: "A",
+    logoGradientClass: "from-[#1e3a8a] to-[#334155]",
+    officialLogoPath: "/logos/banks/aub.svg",
+    officialLogoUrl: "https://logo.clearbit.com/aub.com.ph",
+  },
+  MAY: {
+    logoText: "M",
+    logoGradientClass: "from-[#facc15] to-[#0f766e]",
+    officialLogoPath: "/logos/banks/maybank.svg",
+    officialLogoUrl: "https://logo.clearbit.com/maybank.com.ph",
+  },
+  HSBC: {
+    logoText: "H",
+    logoGradientClass: "from-[#ffffff] to-[#d4d4d8]",
+    officialLogoPath: "/logos/banks/hsbc.svg",
+    officialLogoUrl: "https://logo.clearbit.com/hsbc.com.ph",
+  },
+  BOC: {
+    logoText: "BC",
+    logoGradientClass: "from-[#ef4444] to-[#7f1d1d]",
+    officialLogoPath: "/logos/banks/bank-of-commerce.svg",
+    officialLogoUrl: "https://logo.clearbit.com/bankcom.com.ph",
+  },
+  SBA: {
+    logoText: "S",
+    logoGradientClass: "from-[#2563eb] to-[#0f172a]",
+    officialLogoPath: "/logos/banks/sterling-bank-of-asia.svg",
+    officialLogoUrl: "https://logo.clearbit.com/sterlingbankasia.com",
+  },
+  BNET: {
+    logoText: "BN",
+    logoGradientClass: "from-[#1d4ed8] to-[#1e40af]",
+    officialLogoPath: "/logos/banks/bancnet.svg",
+    officialLogoUrl: "https://logo.clearbit.com/bancnetonline.com",
+  },
+  CIR: {
+    logoText: "C",
+    logoGradientClass: "from-[#f97316] to-[#ea580c]",
+    officialLogoPath: "/logos/banks/cirrus.svg",
+    officialLogoUrl: "https://logo.clearbit.com/mastercard.com",
+  },
+  VPL: {
+    logoText: "V",
+    logoGradientClass: "from-[#1d4ed8] to-[#f59e0b]",
+    officialLogoPath: "/logos/banks/visa-plus.svg",
+    officialLogoUrl: "https://logo.clearbit.com/visa.com",
+  },
 };
 
 function normalizeLogoText(code: string) {
@@ -209,7 +281,7 @@ const WALLET_BADGES: Array<{
     },
   },
   {
-    keywords: ["gotyme"],
+    keywords: ["gotyme", "gotyme wallet"],
     badge: {
       code: "GT",
       kind: "wallet",
@@ -259,6 +331,16 @@ const WALLET_BADGES: Array<{
     },
   },
   {
+    keywords: ["bayad app", "bayad"],
+    badge: {
+      code: "BA",
+      kind: "wallet",
+      toneClass: "border border-cyan-200/80 bg-cyan-100/70 text-cyan-800 dark:border-cyan-800/60 dark:bg-cyan-900/25 dark:text-cyan-200",
+      labelClass: "text-cyan-700/85 dark:text-cyan-300/85",
+      iconToneClass: "text-cyan-700 bg-cyan-100/70 dark:text-cyan-300 dark:bg-cyan-900/30",
+    },
+  },
+  {
     keywords: ["diskartech"],
     badge: {
       code: "DT",
@@ -266,6 +348,16 @@ const WALLET_BADGES: Array<{
       toneClass: "border border-violet-200/80 bg-violet-100/70 text-violet-800 dark:border-violet-800/60 dark:bg-violet-900/25 dark:text-violet-200",
       labelClass: "text-violet-700/85 dark:text-violet-300/85",
       iconToneClass: "text-violet-700 bg-violet-100/70 dark:text-violet-300 dark:bg-violet-900/30",
+    },
+  },
+  {
+    keywords: ["maribank", "mari bank"],
+    badge: {
+      code: "MBK",
+      kind: "wallet",
+      toneClass: "border border-slate-300/80 bg-slate-100/80 text-slate-800 dark:border-slate-600/70 dark:bg-slate-700/50 dark:text-slate-100",
+      labelClass: "text-slate-700/85 dark:text-slate-200/90",
+      iconToneClass: "text-slate-700 bg-slate-100/80 dark:text-slate-200 dark:bg-slate-700/60",
     },
   },
   {
@@ -279,7 +371,7 @@ const WALLET_BADGES: Array<{
     },
   },
   {
-    keywords: ["bdo"],
+    keywords: ["bdo", "bdo unibank"],
     badge: {
       code: "BDO",
       kind: "bank",
@@ -289,7 +381,7 @@ const WALLET_BADGES: Array<{
     },
   },
   {
-    keywords: ["unionbank"],
+    keywords: ["unionbank", "union bank"],
     badge: {
       code: "UB",
       kind: "bank",
@@ -299,7 +391,7 @@ const WALLET_BADGES: Array<{
     },
   },
   {
-    keywords: ["landbank"],
+    keywords: ["landbank", "land bank"],
     badge: {
       code: "LB",
       kind: "bank",
@@ -329,7 +421,7 @@ const WALLET_BADGES: Array<{
     },
   },
   {
-    keywords: ["security bank"],
+    keywords: ["security bank", "securitybank"],
     badge: {
       code: "SB",
       kind: "bank",
@@ -349,7 +441,7 @@ const WALLET_BADGES: Array<{
     },
   },
   {
-    keywords: ["chinabank"],
+    keywords: ["chinabank", "china bank"],
     badge: {
       code: "CB",
       kind: "bank",
@@ -369,7 +461,7 @@ const WALLET_BADGES: Array<{
     },
   },
   {
-    keywords: ["seabank"],
+    keywords: ["seabank", "sea bank"],
     badge: {
       code: "SEA",
       kind: "bank",
@@ -406,6 +498,106 @@ const WALLET_BADGES: Array<{
       toneClass: "border border-sky-200/80 bg-sky-100/70 text-sky-800 dark:border-sky-800/60 dark:bg-sky-900/25 dark:text-sky-200",
       labelClass: "text-sky-700/85 dark:text-sky-300/85",
       iconToneClass: "text-sky-700 bg-sky-100/70 dark:text-sky-300 dark:bg-sky-900/30",
+    },
+  },
+  {
+    keywords: ["psbank", "philippine savings bank"],
+    badge: {
+      code: "PSB",
+      kind: "bank",
+      toneClass: "border border-red-200/80 bg-red-100/70 text-red-800 dark:border-red-800/60 dark:bg-red-900/25 dark:text-red-200",
+      labelClass: "text-red-700/85 dark:text-red-300/85",
+      iconToneClass: "text-red-700 bg-red-100/70 dark:text-red-300 dark:bg-red-900/30",
+    },
+  },
+  {
+    keywords: ["dbp", "development bank of the philippines"],
+    badge: {
+      code: "DBP",
+      kind: "bank",
+      toneClass: "border border-cyan-200/80 bg-cyan-100/70 text-cyan-800 dark:border-cyan-800/60 dark:bg-cyan-900/25 dark:text-cyan-200",
+      labelClass: "text-cyan-700/85 dark:text-cyan-300/85",
+      iconToneClass: "text-cyan-700 bg-cyan-100/70 dark:text-cyan-300 dark:bg-cyan-900/30",
+    },
+  },
+  {
+    keywords: ["aub", "asia united bank"],
+    badge: {
+      code: "AUB",
+      kind: "bank",
+      toneClass: "border border-indigo-200/80 bg-indigo-100/70 text-indigo-800 dark:border-indigo-800/60 dark:bg-indigo-900/25 dark:text-indigo-200",
+      labelClass: "text-indigo-700/85 dark:text-indigo-300/85",
+      iconToneClass: "text-indigo-700 bg-indigo-100/70 dark:text-indigo-300 dark:bg-indigo-900/30",
+    },
+  },
+  {
+    keywords: ["maybank"],
+    badge: {
+      code: "MAY",
+      kind: "bank",
+      toneClass: "border border-yellow-200/80 bg-yellow-100/70 text-yellow-900 dark:border-yellow-700/60 dark:bg-yellow-900/30 dark:text-yellow-200",
+      labelClass: "text-yellow-800/90 dark:text-yellow-200/90",
+      iconToneClass: "text-yellow-800 bg-yellow-100/70 dark:text-yellow-200 dark:bg-yellow-900/35",
+    },
+  },
+  {
+    keywords: ["hsbc"],
+    badge: {
+      code: "HSBC",
+      kind: "bank",
+      toneClass: "border border-slate-300/80 bg-slate-100/80 text-slate-800 dark:border-slate-600/70 dark:bg-slate-700/50 dark:text-slate-100",
+      labelClass: "text-slate-700/85 dark:text-slate-200/90",
+      iconToneClass: "text-slate-700 bg-slate-100/80 dark:text-slate-200 dark:bg-slate-700/60",
+    },
+  },
+  {
+    keywords: ["bank of commerce", "bankcom"],
+    badge: {
+      code: "BOC",
+      kind: "bank",
+      toneClass: "border border-rose-200/80 bg-rose-100/70 text-rose-800 dark:border-rose-800/60 dark:bg-rose-900/25 dark:text-rose-200",
+      labelClass: "text-rose-700/85 dark:text-rose-300/85",
+      iconToneClass: "text-rose-700 bg-rose-100/70 dark:text-rose-300 dark:bg-rose-900/30",
+    },
+  },
+  {
+    keywords: ["sterling bank of asia", "sterling"],
+    badge: {
+      code: "SBA",
+      kind: "bank",
+      toneClass: "border border-blue-200/80 bg-blue-100/70 text-blue-800 dark:border-blue-800/60 dark:bg-blue-900/25 dark:text-blue-200",
+      labelClass: "text-blue-700/85 dark:text-blue-300/85",
+      iconToneClass: "text-blue-700 bg-blue-100/70 dark:text-blue-300 dark:bg-blue-900/30",
+    },
+  },
+  {
+    keywords: ["bancnet"],
+    badge: {
+      code: "BNET",
+      kind: "bank",
+      toneClass: "border border-blue-200/80 bg-blue-100/70 text-blue-800 dark:border-blue-800/60 dark:bg-blue-900/25 dark:text-blue-200",
+      labelClass: "text-blue-700/85 dark:text-blue-300/85",
+      iconToneClass: "text-blue-700 bg-blue-100/70 dark:text-blue-300 dark:bg-blue-900/30",
+    },
+  },
+  {
+    keywords: ["cirrus"],
+    badge: {
+      code: "CIR",
+      kind: "bank",
+      toneClass: "border border-orange-200/80 bg-orange-100/70 text-orange-800 dark:border-orange-800/60 dark:bg-orange-900/25 dark:text-orange-200",
+      labelClass: "text-orange-700/85 dark:text-orange-300/85",
+      iconToneClass: "text-orange-700 bg-orange-100/70 dark:text-orange-300 dark:bg-orange-900/30",
+    },
+  },
+  {
+    keywords: ["visa plus", "plus atm", "visa+"],
+    badge: {
+      code: "VPL",
+      kind: "bank",
+      toneClass: "border border-indigo-200/80 bg-indigo-100/70 text-indigo-800 dark:border-indigo-800/60 dark:bg-indigo-900/25 dark:text-indigo-200",
+      labelClass: "text-indigo-700/85 dark:text-indigo-300/85",
+      iconToneClass: "text-indigo-700 bg-indigo-100/70 dark:text-indigo-300 dark:bg-indigo-900/30",
     },
   },
 ];

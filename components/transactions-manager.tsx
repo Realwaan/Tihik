@@ -2,7 +2,7 @@
 
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Plus, Trash2, Download, FileUp, Copy } from "lucide-react";
+import { Loader2, Plus, Trash2, Download, FileUp, Copy, X } from "lucide-react";
 import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { CategoryCombobox } from "@/components/ui/category-combobox";
@@ -89,6 +89,7 @@ export function TransactionsManager() {
   const [receiptRotation, setReceiptRotation] = useState(0);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   async function loadTransactions() {
     try {
@@ -755,6 +756,27 @@ export function TransactionsManager() {
     [filteredTransactions]
   );
 
+  useEffect(() => {
+    if (!selectedTransaction) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSelectedTransaction(null);
+      }
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [selectedTransaction]);
+
   return (
     <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
       <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-black/30 sm:p-6">
@@ -1156,7 +1178,23 @@ export function TransactionsManager() {
           ) : (
             <div className="space-y-3">
               {visibleTransactions.map((transaction) => (
-                <article key={transaction.id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 px-4 py-4 dark:border-slate-700 dark:bg-slate-950/50">
+                <article
+                  key={transaction.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedTransaction(transaction)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) {
+                      return;
+                    }
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedTransaction(transaction);
+                    }
+                  }}
+                  className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 px-4 py-4 transition-colors hover:border-blue-200 hover:bg-blue-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-950/50 dark:hover:border-blue-800 dark:hover:bg-blue-900/20"
+                  aria-label={`View details for ${transaction.category} ${transaction.type.toLowerCase()} transaction`}
+                >
                   <div>
                     <div className="flex items-center gap-3">
                       <p className="font-medium text-slate-900 dark:text-slate-100">{transaction.category}</p>
@@ -1171,10 +1209,7 @@ export function TransactionsManager() {
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      {transaction.type === "TRANSFER"
-                        ? transaction.note ||
-                          `${transaction.sourceAccount || "Unknown"} to ${transaction.destinationAccount || "Unknown"}`
-                        : transaction.note || transaction.date.slice(0, 10)}
+                      {getTransactionSummary(transaction)}
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
@@ -1190,16 +1225,15 @@ export function TransactionsManager() {
                         : transaction.type === "EXPENSE"
                           ? "-"
                           : "↔ "}
-                      {new Intl.NumberFormat("en-US", {
-                        style: "currency",
-                        currency: transaction.currency,
-                        maximumFractionDigits: transaction.currency === "JPY" ? 0 : 2,
-                      }).format(Number(transaction.amount))}
+                      {formatTransactionAmount(transaction)}
                     </p>
                     <button
                       type="button"
                       disabled={duplicatingId === transaction.id}
-                      onClick={() => handleDuplicate(transaction.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleDuplicate(transaction.id);
+                      }}
                        className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-400 dark:hover:border-amber-800 dark:hover:bg-amber-900/30 dark:hover:text-amber-300"
                       aria-label="Duplicate transaction"
                     >
@@ -1211,7 +1245,10 @@ export function TransactionsManager() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDelete(transaction.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleDelete(transaction.id);
+                      }}
                        className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-red-800 dark:hover:bg-red-900/30 dark:hover:text-red-400"
                       aria-label="Delete transaction"
                     >
@@ -1229,6 +1266,116 @@ export function TransactionsManager() {
           )}
         </div>
       </section>
+
+      {selectedTransaction ? (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center p-0 sm:items-center sm:p-4">
+          <button
+            type="button"
+            aria-label="Close transaction details"
+            onClick={() => setSelectedTransaction(null)}
+            className="absolute inset-0 bg-slate-950/55 backdrop-blur-[1px]"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="transaction-details-title"
+            className="relative z-10 w-full max-w-xl rounded-t-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:rounded-3xl sm:p-6"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  Transaction details
+                </p>
+                <h3 id="transaction-details-title" className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {selectedTransaction.category}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTransaction(null)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                What was this for?
+              </p>
+              <p className="mt-1.5 text-sm text-slate-700 dark:text-slate-200">
+                {getTransactionPurpose(selectedTransaction)}
+              </p>
+            </div>
+
+            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/20">
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Type</dt>
+                <dd className={`mt-1 text-sm font-semibold ${
+                  selectedTransaction.type === "INCOME"
+                    ? "text-emerald-700 dark:text-emerald-300"
+                    : selectedTransaction.type === "EXPENSE"
+                      ? "text-rose-700 dark:text-rose-300"
+                      : "text-amber-700 dark:text-amber-300"
+                }`}>
+                  {selectedTransaction.type}
+                </dd>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/20">
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Amount</dt>
+                <dd className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {selectedTransaction.type === "INCOME"
+                    ? "+"
+                    : selectedTransaction.type === "EXPENSE"
+                      ? "-"
+                      : "↔ "}
+                  {formatTransactionAmount(selectedTransaction)}
+                </dd>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/20">
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Date</dt>
+                <dd className="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {formatTransactionDate(selectedTransaction.date, true)}
+                </dd>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/20">
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Source account</dt>
+                <dd className="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {selectedTransaction.sourceAccount?.trim() || "Not provided"}
+                </dd>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/20">
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Destination account</dt>
+                <dd className="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {selectedTransaction.destinationAccount?.trim() || "Not provided"}
+                </dd>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/20">
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Transaction ID</dt>
+                <dd className="mt-1 break-all text-xs font-medium text-slate-600 dark:text-slate-300">
+                  {selectedTransaction.id}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedTransaction(null)}
+                className="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1240,6 +1387,64 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       {children}
     </label>
   );
+}
+
+function formatTransactionAmount(transaction: Transaction) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: transaction.currency,
+    maximumFractionDigits: transaction.currency === "JPY" ? 0 : 2,
+  }).format(Number(transaction.amount));
+}
+
+function formatTransactionDate(value: string, withTime = false) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value.slice(0, 10);
+  }
+
+  if (withTime) {
+    return parsed.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  return parsed.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getTransactionSummary(transaction: Transaction) {
+  if (transaction.type === "TRANSFER") {
+    return (
+      transaction.note?.trim() ||
+      `${transaction.sourceAccount || "Unknown"} to ${transaction.destinationAccount || "Unknown"}`
+    );
+  }
+
+  return transaction.note?.trim() || formatTransactionDate(transaction.date);
+}
+
+function getTransactionPurpose(transaction: Transaction) {
+  if (transaction.note?.trim()) {
+    return transaction.note.trim();
+  }
+
+  if (transaction.type === "TRANSFER") {
+    const from = transaction.sourceAccount?.trim() || "Unknown account";
+    const to = transaction.destinationAccount?.trim() || "Unknown account";
+    return `Transfer from ${from} to ${to}.`;
+  }
+
+  return `${transaction.type === "INCOME" ? "Income" : "Expense"} recorded under ${
+    transaction.category
+  }.`;
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {

@@ -2,7 +2,7 @@
 
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, PieChart, RefreshCcw, Wallet, Target, Users, User, Bell, Landmark, Smartphone, CreditCard } from "lucide-react";
+import { ArrowUpRight, PieChart, RefreshCcw, Wallet, Target, Users, User, Bell, Landmark, Smartphone, CreditCard, MoreHorizontal } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -23,6 +23,8 @@ import { MobileNavDock } from "@/components/mobile-nav-dock";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { WalletCategoryBadge } from "@/components/ui/wallet-category-badge";
+import { WalletLogoDot } from "@/components/ui/wallet-logo-dot";
+import { getAccountCardTheme } from "@/lib/account-card-theme";
 import { getWalletBadge } from "@/lib/wallet-badges";
 
 type DashboardData = {
@@ -123,6 +125,7 @@ type NotificationPreferences = {
 
 const palette = ["#f59e0b", "#3b82f6", "#8b5cf6", "#14b8a6", "#ef4444", "#22c55e"];
 const READ_NOTIFICATIONS_STORAGE_KEY = "trackit.notifications.read.v1";
+const ACCOUNT_ORDER_STORAGE_KEY = "trackit.dashboard.account-order.v1";
 
 function Skeleton(props: React.ComponentProps<typeof MuiSkeleton>) {
   const { sx, ...rest } = props;
@@ -155,6 +158,9 @@ export function DashboardDashboard() {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [accountView, setAccountView] = useState<"ALL" | "DEBIT" | "CREDIT">("ALL");
   const [accountCardsAnimated, setAccountCardsAnimated] = useState(true);
+  const [accountOrder, setAccountOrder] = useState<string[]>([]);
+  const [draggingAccountId, setDraggingAccountId] = useState<string | null>(null);
+  const [openAccountMenuId, setOpenAccountMenuId] = useState<string | null>(null);
   const [previousDebitNetWorth, setPreviousDebitNetWorth] = useState<number | null>(null);
   const notificationsRef = useRef<HTMLDivElement | null>(null);
 
@@ -248,6 +254,19 @@ export function DashboardDashboard() {
 
   useEffect(() => {
     try {
+      const raw = window.localStorage.getItem(ACCOUNT_ORDER_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        setAccountOrder(parsed.filter((value): value is string => typeof value === "string"));
+      }
+    } catch {
+      // ignore invalid local storage values
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
       window.localStorage.setItem(
         READ_NOTIFICATIONS_STORAGE_KEY,
         JSON.stringify(Array.from(readNotificationIds))
@@ -313,14 +332,38 @@ export function DashboardDashboard() {
 
     return cards.sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
   }, [data]);
+
+  const orderedAccountCards = useMemo(() => {
+    if (accountCards.length === 0) {
+      return accountCards;
+    }
+
+    if (accountOrder.length === 0) {
+      return accountCards;
+    }
+
+    const cardMap = new Map(accountCards.map((item) => [item.id, item]));
+    const ordered = accountOrder
+      .map((id) => cardMap.get(id))
+      .filter((item): item is (typeof accountCards)[number] => Boolean(item));
+
+    const missing = accountCards.filter((item) => !accountOrder.includes(item.id));
+    return [...ordered, ...missing];
+  }, [accountCards, accountOrder]);
+
+  const orderedAccountIds = useMemo(
+    () => orderedAccountCards.map((item) => item.id),
+    [orderedAccountCards]
+  );
+
   const filteredAccountCards = useMemo(
     () =>
-      accountCards.filter((item) => {
+      orderedAccountCards.filter((item) => {
         if (accountView === "ALL") return true;
         if (accountView === "DEBIT") return item.balance >= 0;
         return item.balance < 0;
       }),
-    [accountCards, accountView]
+    [orderedAccountCards, accountView]
   );
   const debitNetWorth = useMemo(
     () => accountCards.filter((item) => item.balance >= 0).reduce((sum, item) => sum + item.balance, 0),
@@ -339,6 +382,33 @@ export function DashboardDashboard() {
   }, [debitNetWorth, previousDebitNetWorth]);
   const warningCount = notifications.filter((n) => n.severity === "warning" && !readNotificationIds.has(n.id)).length;
   const unreadCount = notifications.filter((n) => !readNotificationIds.has(n.id)).length;
+
+  useEffect(() => {
+    if (accountCards.length === 0) {
+      return;
+    }
+
+    setAccountOrder((current) => {
+      const availableIds = accountCards.map((item) => item.id);
+      const existing = current.filter((id) => availableIds.includes(id));
+      const missing = availableIds.filter((id) => !existing.includes(id));
+      const next = [...existing, ...missing];
+
+      if (next.length === current.length && next.every((id, index) => id === current[index])) {
+        return current;
+      }
+
+      return next;
+    });
+  }, [accountCards]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ACCOUNT_ORDER_STORAGE_KEY, JSON.stringify(accountOrder));
+    } catch {
+      // ignore storage write failures
+    }
+  }, [accountOrder]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -441,6 +511,65 @@ export function DashboardDashboard() {
       const next = new Set(previous);
       notifications.forEach((item) => next.add(item.id));
       return next;
+    });
+  }
+
+  function reorderAccountCards(movingId: string, targetId: string) {
+    if (movingId === targetId) {
+      return;
+    }
+
+    setAccountOrder((current) => {
+      const baseOrder = current.length > 0 ? [...current] : accountCards.map((item) => item.id);
+      const movingIndex = baseOrder.indexOf(movingId);
+      const targetIndex = baseOrder.indexOf(targetId);
+
+      if (movingIndex < 0 || targetIndex < 0) {
+        return current;
+      }
+
+      baseOrder.splice(movingIndex, 1);
+      baseOrder.splice(targetIndex, 0, movingId);
+      return baseOrder;
+    });
+  }
+
+  function moveAccountCardByStep(accountId: string, direction: "up" | "down") {
+    setAccountOrder((current) => {
+      const baseOrder = current.length > 0 ? [...current] : accountCards.map((item) => item.id);
+      const index = baseOrder.indexOf(accountId);
+
+      if (index < 0) {
+        return current;
+      }
+
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= baseOrder.length) {
+        return current;
+      }
+
+      const [item] = baseOrder.splice(index, 1);
+      baseOrder.splice(targetIndex, 0, item);
+      return baseOrder;
+    });
+  }
+
+  function moveAccountCardToEdge(accountId: string, edge: "top" | "bottom") {
+    setAccountOrder((current) => {
+      const baseOrder = current.length > 0 ? [...current] : accountCards.map((item) => item.id);
+      const index = baseOrder.indexOf(accountId);
+      if (index < 0) {
+        return current;
+      }
+
+      const [item] = baseOrder.splice(index, 1);
+      if (edge === "top") {
+        baseOrder.unshift(item);
+      } else {
+        baseOrder.push(item);
+      }
+
+      return baseOrder;
     });
   }
 
@@ -813,6 +942,10 @@ export function DashboardDashboard() {
                 </a>
               </div>
 
+              <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
+                Drag cards to rearrange, or use the menu on each card. Order is saved on this device.
+              </p>
+
               {(data?.walletBreakdown?.uncategorizedAccounts ?? []).length > 0 ? (
                 <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-800/60 dark:bg-amber-900/20">
                   <p className="text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
@@ -843,12 +976,16 @@ export function DashboardDashboard() {
                 ) : (
                   filteredAccountCards.map((account) => {
                     const badge = getWalletBadge(account.category);
-                    const tone =
+                    const cardTheme = getAccountCardTheme(account.category, account.group);
+                    const groupLabel =
                       account.group === "cash"
-                        ? "border-amber-200/70 bg-amber-50/70 dark:border-amber-800/60 dark:bg-amber-900/20"
+                        ? "Cash"
                         : account.group === "ewallet"
-                          ? "border-sky-200/70 bg-sky-50/70 dark:border-sky-800/60 dark:bg-sky-900/20"
-                          : "border-indigo-200/70 bg-indigo-50/70 dark:border-indigo-800/60 dark:bg-indigo-900/20";
+                          ? "E-wallet"
+                          : "Bank";
+                    const orderIndex = orderedAccountIds.indexOf(account.id);
+                    const isFirst = orderIndex <= 0;
+                    const isLast = orderIndex === orderedAccountIds.length - 1;
                     const Icon =
                       account.group === "cash"
                         ? Wallet
@@ -859,37 +996,133 @@ export function DashboardDashboard() {
                     return (
                       <article
                         key={account.id}
-                        className={`relative overflow-hidden rounded-3xl border p-4 transition-all duration-300 ease-out ${tone} ${
+                        draggable
+                        onDragStart={() => {
+                          setDraggingAccountId(account.id);
+                          setOpenAccountMenuId(null);
+                        }}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          if (draggingAccountId) {
+                            reorderAccountCards(draggingAccountId, account.id);
+                          }
+                          setDraggingAccountId(null);
+                        }}
+                        onDragEnd={() => setDraggingAccountId(null)}
+                        className={`relative min-h-[196px] cursor-move overflow-hidden rounded-3xl border p-4 transition-all duration-300 ease-out sm:p-5 ${cardTheme.cardClass} ${
                           accountCardsAnimated
                             ? "translate-y-0 scale-100 opacity-100"
                             : "translate-y-2 scale-[0.98] opacity-0"
-                        }`}
+                        } ${draggingAccountId === account.id ? "ring-2 ring-white/40 opacity-80" : ""}`}
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">{account.category}</p>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
-                              {account.balance >= 0 ? "Debit" : "Credit"} • {preferredCurrency}
-                            </p>
+                          <div className="inline-flex min-w-0 items-start gap-3">
+                            {badge ? (
+                              <WalletLogoDot
+                                badge={badge}
+                                label={account.category}
+                                sizeClass="h-11 w-11"
+                                textClass="text-[10px]"
+                                imageClassName="absolute inset-[2px] h-[calc(100%-4px)] w-[calc(100%-4px)] rounded-full bg-white object-contain p-[2px]"
+                              />
+                            ) : (
+                              <span
+                                className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ${cardTheme.fallbackLogoClass}`}
+                              >
+                                <Icon className="h-5 w-5" />
+                              </span>
+                            )}
+                            <div className="min-w-0">
+                              <p className={`truncate text-xl font-semibold tracking-[0.02em] ${cardTheme.titleClass}`}>{account.category}</p>
+                              <p className={`text-sm ${cardTheme.subtitleClass}`}>
+                                {account.balance >= 0 ? "Debit" : "Credit"} • {preferredCurrency}
+                              </p>
+                            </div>
                           </div>
-                          {account.group === "cash" ? (
-                            <span className="rounded-full border border-amber-200/80 bg-amber-100/70 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-800 dark:border-amber-800/60 dark:bg-amber-900/25 dark:text-amber-200">CASH</span>
-                          ) : (
-                            <WalletCategoryBadge category={account.category} />
-                          )}
+                          <div className="relative inline-flex items-center gap-1">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${cardTheme.pillClass}`}
+                            >
+                              {groupLabel}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label="Account card actions"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setOpenAccountMenuId((current) =>
+                                  current === account.id ? null : account.id
+                                );
+                              }}
+                              className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${cardTheme.pillClass}`}
+                            >
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </button>
+                            {openAccountMenuId === account.id ? (
+                              <div
+                                className="absolute right-0 top-9 z-20 min-w-[9.5rem] rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <button
+                                  type="button"
+                                  disabled={isFirst}
+                                  onClick={() => {
+                                    moveAccountCardToEdge(account.id, "top");
+                                    setOpenAccountMenuId(null);
+                                  }}
+                                  className="block w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                  Move to top
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isFirst}
+                                  onClick={() => {
+                                    moveAccountCardByStep(account.id, "up");
+                                    setOpenAccountMenuId(null);
+                                  }}
+                                  className="mt-1 block w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                  Move up
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isLast}
+                                  onClick={() => {
+                                    moveAccountCardByStep(account.id, "down");
+                                    setOpenAccountMenuId(null);
+                                  }}
+                                  className="mt-1 block w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                  Move down
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isLast}
+                                  onClick={() => {
+                                    moveAccountCardToEdge(account.id, "bottom");
+                                    setOpenAccountMenuId(null);
+                                  }}
+                                  className="mt-1 block w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                  Move to bottom
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                         <div className="mt-8">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Balance</p>
-                          <p className="mt-1 text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                          <p className={`text-xs font-semibold uppercase tracking-[0.14em] ${cardTheme.balanceLabelClass}`}>Balance</p>
+                          <p className={`mt-1 text-4xl font-semibold tracking-tight ${cardTheme.balanceValueClass}`}>
                             {formatCurrency(account.balance, preferredCurrency)}
                           </p>
                         </div>
-                        <Icon className="pointer-events-none absolute bottom-3 right-3 h-14 w-14 text-slate-300/35 dark:text-slate-200/20" />
-                        {badge ? (
-                          <span className="pointer-events-none absolute left-4 top-4 text-3xl font-black tracking-tight text-slate-300/30 dark:text-slate-200/15">
-                            {badge.code}
-                          </span>
-                        ) : null}
+                        <Icon className={`pointer-events-none absolute bottom-3 right-3 h-14 w-14 ${cardTheme.watermarkClass}`} />
                       </article>
                     );
                   })
