@@ -2,7 +2,18 @@
 
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Plus, Trash2, Download, FileUp, Copy, X } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Copy,
+  Download,
+  FileUp,
+  Loader2,
+  Plus,
+  Repeat2,
+  Trash2,
+  X,
+} from "lucide-react";
 import Skeleton from "@mui/material/Skeleton";
 import { useToast } from "@/components/toast-provider";
 import { CategoryCombobox } from "@/components/ui/category-combobox";
@@ -46,6 +57,30 @@ type ReceiptCrop = {
   height: number;
 };
 
+type ActivityRange = "7D" | "30D" | "90D" | "ALL";
+
+type AccountActivityDirection = "inflow" | "outflow" | "transfer";
+
+type AccountActivityEntry = {
+  transaction: Transaction;
+  direction: AccountActivityDirection;
+  headline: string;
+  detail: string;
+};
+
+type AccountActivitySnapshot = {
+  entries: AccountActivityEntry[];
+  inflowCount: number;
+  outflowCount: number;
+  transferCount: number;
+  totalMatches: number;
+  lastActiveLabel: string;
+  momentum: number;
+  trendValues: number[];
+  trendLabels: string[];
+  hasHistoricalActivityOutsideRange: boolean;
+};
+
 const initialForm: TransactionFormState = {
   amount: "",
   currency: "USD",
@@ -62,6 +97,16 @@ const accountOptions = Array.from(
 ).sort((a, b) => a.localeCompare(b));
 
 const TRANSACTIONS_PER_PAGE = 10;
+
+const ACTIVITY_RANGE_OPTIONS: Array<{
+  value: ActivityRange;
+  label: string;
+}> = [
+  { value: "7D", label: "7D" },
+  { value: "30D", label: "30D" },
+  { value: "90D", label: "90D" },
+  { value: "ALL", label: "All" },
+];
 
 export function TransactionsManager() {
   const { showToast } = useToast();
@@ -91,6 +136,9 @@ export function TransactionsManager() {
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [activityAccount, setActivityAccount] = useState("");
+  const [activityRange, setActivityRange] = useState<ActivityRange>("30D");
+  const [activityVisualReady, setActivityVisualReady] = useState(true);
 
   async function loadTransactions() {
     try {
@@ -775,6 +823,30 @@ export function TransactionsManager() {
     setCurrentPage(1);
   }, [searchQuery, filterType]);
 
+  const selectedTransactionAccounts = useMemo(
+    () => getTransactionAccounts(selectedTransaction),
+    [selectedTransaction]
+  );
+
+  const accountActivity = useMemo(() => {
+    if (!activityAccount.trim()) {
+      return {
+        entries: [],
+        inflowCount: 0,
+        outflowCount: 0,
+        transferCount: 0,
+        totalMatches: 0,
+        lastActiveLabel: "No linked activity",
+        momentum: 0,
+        trendValues: [],
+        trendLabels: [],
+        hasHistoricalActivityOutsideRange: false,
+      } satisfies AccountActivitySnapshot;
+    }
+
+    return buildAccountActivitySnapshot(transactions, activityAccount, activityRange);
+  }, [transactions, activityAccount, activityRange]);
+
   useEffect(() => {
     setCurrentPage((previous) => {
       if (filteredTransactions.length === 0) {
@@ -805,6 +877,37 @@ export function TransactionsManager() {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [selectedTransaction]);
+
+  useEffect(() => {
+    if (selectedTransactionAccounts.length === 0) {
+      setActivityAccount("");
+      return;
+    }
+
+    setActivityAccount((current) => {
+      const normalizedCurrent = current.trim().toLowerCase();
+      if (
+        normalizedCurrent &&
+        selectedTransactionAccounts.some(
+          (account) => account.toLowerCase() === normalizedCurrent
+        )
+      ) {
+        return current;
+      }
+      return selectedTransactionAccounts[0];
+    });
+  }, [selectedTransactionAccounts]);
+
+  useEffect(() => {
+    setActivityVisualReady(false);
+    const timeoutId = window.setTimeout(() => {
+      setActivityVisualReady(true);
+    }, 55);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [activityRange, activityAccount, selectedTransaction?.id]);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
@@ -1339,7 +1442,7 @@ export function TransactionsManager() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="transaction-details-title"
-            className="relative z-10 w-full max-w-xl rounded-t-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:rounded-3xl sm:p-6"
+            className="relative z-10 max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:max-h-[88vh] sm:rounded-3xl sm:p-6"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -1368,6 +1471,223 @@ export function TransactionsManager() {
                 {getTransactionPurpose(selectedTransaction)}
               </p>
             </div>
+
+            <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
+              <div className="bg-gradient-to-br from-sky-50 via-white to-amber-50 p-4 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/70">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                      Account activity
+                    </p>
+                    <h4 className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+                      {activityAccount || "No account linked"}
+                    </h4>
+                  </div>
+                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+                    {accountActivity.totalMatches} records | {getActivityRangeLabel(activityRange)}
+                  </span>
+                </div>
+
+                {selectedTransactionAccounts.length > 1 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedTransactionAccounts.map((account) => {
+                      const isActive =
+                        account.toLowerCase() === activityAccount.trim().toLowerCase();
+
+                      return (
+                        <button
+                          key={account}
+                          type="button"
+                          onClick={() => setActivityAccount(account)}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            isActive
+                              ? "border-sky-300 bg-sky-100 text-sky-800 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-200"
+                              : "border-slate-200 bg-white/80 text-slate-600 hover:bg-white dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          {account}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                {activityAccount ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {ACTIVITY_RANGE_OPTIONS.map((rangeOption) => {
+                      const isActive = rangeOption.value === activityRange;
+                      return (
+                        <button
+                          key={rangeOption.value}
+                          type="button"
+                          onClick={() => setActivityRange(rangeOption.value)}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            isActive
+                              ? "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
+                              : "border-slate-200 bg-white/80 text-slate-600 hover:bg-white dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:bg-slate-800"
+                          }`}
+                          aria-label={`Show account activity for ${rangeOption.label}`}
+                        >
+                          {rangeOption.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                {activityAccount ? (
+                  <>
+                    <div
+                      key={`activity-pulse-${activityAccount}-${activityRange}`}
+                      className={`mt-4 rounded-2xl border border-slate-200 bg-white/75 p-3 transition-all duration-300 dark:border-slate-700 dark:bg-slate-900/60 ${
+                        activityVisualReady
+                          ? "translate-y-0 opacity-100"
+                          : "-translate-y-1 opacity-0"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          Activity pulse
+                        </p>
+                        <span
+                          className={`text-xs font-semibold ${
+                            accountActivity.momentum >= 0
+                              ? "text-emerald-700 dark:text-emerald-300"
+                              : "text-rose-700 dark:text-rose-300"
+                          }`}
+                        >
+                          {accountActivity.momentum >= 0 ? "+" : ""}
+                          {accountActivity.momentum} momentum
+                        </span>
+                      </div>
+                      <AccountActivitySparkline values={accountActivity.trendValues} />
+                      <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                        <span>{accountActivity.trendLabels[0] || "Start"}</span>
+                        <span>
+                          {accountActivity.trendLabels[accountActivity.trendLabels.length - 1] ||
+                            "Now"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/70">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Inflow events</p>
+                        <p className="mt-1 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                          {accountActivity.inflowCount}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/70">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Outflow events</p>
+                        <p className="mt-1 text-sm font-semibold text-rose-700 dark:text-rose-300">
+                          {accountActivity.outflowCount}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/70">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Transfers</p>
+                        <p className="mt-1 text-sm font-semibold text-amber-700 dark:text-amber-300">
+                          {accountActivity.transferCount}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/70 sm:col-span-2 lg:col-span-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Last active</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                          {accountActivity.lastActiveLabel}
+                        </p>
+                      </div>
+                    </div>
+
+                    {accountActivity.entries.length > 1 ? (
+                      <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 sm:hidden">
+                        Swipe to browse timeline cards.
+                      </p>
+                    ) : null}
+
+                    <div className="mt-4">
+                      {accountActivity.entries.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 px-3 py-5 text-center text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+                          {accountActivity.hasHistoricalActivityOutsideRange
+                            ? "No activity found in this time range. Try 90D or All."
+                            : "No account activity found yet."}
+                        </div>
+                      ) : (
+                        <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0">
+                          <div className="flex snap-x gap-2 sm:block sm:space-y-2">
+                            {accountActivity.entries.map((entry, index) => (
+                              <article
+                                key={`activity-${entry.transaction.id}`}
+                                className={`flex min-w-[86%] snap-start items-start gap-3 rounded-2xl border border-slate-200 bg-white/80 p-3 transition-all duration-300 ease-out dark:border-slate-700 dark:bg-slate-900/50 sm:min-w-0 ${
+                                  activityVisualReady
+                                    ? "translate-y-0 opacity-100"
+                                    : "translate-y-1 opacity-0"
+                                }`}
+                                style={{
+                                  transitionDelay: activityVisualReady
+                                    ? `${Math.min(index, 5) * 45}ms`
+                                    : "0ms",
+                                }}
+                              >
+                                <span
+                                  className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                                    entry.direction === "inflow"
+                                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                                      : entry.direction === "outflow"
+                                        ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
+                                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                  }`}
+                                >
+                                  {entry.direction === "inflow" ? (
+                                    <ArrowDownLeft className="h-4 w-4" />
+                                  ) : entry.direction === "outflow" ? (
+                                    <ArrowUpRight className="h-4 w-4" />
+                                  ) : (
+                                    <Repeat2 className="h-4 w-4" />
+                                  )}
+                                </span>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                      {entry.headline}
+                                    </p>
+                                    <p
+                                      className={`text-xs font-semibold ${
+                                        entry.direction === "inflow"
+                                          ? "text-emerald-700 dark:text-emerald-300"
+                                          : entry.direction === "outflow"
+                                            ? "text-rose-700 dark:text-rose-300"
+                                            : "text-amber-700 dark:text-amber-300"
+                                      }`}
+                                    >
+                                      {entry.direction === "inflow"
+                                        ? "+"
+                                        : entry.direction === "outflow"
+                                          ? "-"
+                                          : "↔ "}
+                                      {formatTransactionAmount(entry.transaction)}
+                                    </p>
+                                  </div>
+                                  <p className="mt-0.5 truncate text-xs text-slate-600 dark:text-slate-300">
+                                    {entry.detail}
+                                  </p>
+                                  <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                    {formatTransactionDate(entry.transaction.date, true)}
+                                  </p>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white/70 px-3 py-5 text-center text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+                    Add a source or destination account to this transaction to unlock account activity insights.
+                  </div>
+                )}
+              </div>
+            </section>
 
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/20">
@@ -1505,6 +1825,280 @@ function getTransactionPurpose(transaction: Transaction) {
   return `${transaction.type === "INCOME" ? "Income" : "Expense"} recorded under ${
     transaction.category
   }.`;
+}
+
+function getTransactionAccounts(transaction: Transaction | null): string[] {
+  if (!transaction) {
+    return [];
+  }
+
+  const accountMap = new Map<string, string>();
+  [transaction.sourceAccount, transaction.destinationAccount].forEach((value) => {
+    const trimmed = value?.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    const key = trimmed.toLowerCase();
+    if (!accountMap.has(key)) {
+      accountMap.set(key, trimmed);
+    }
+  });
+
+  return Array.from(accountMap.values());
+}
+
+function buildAccountActivitySnapshot(
+  transactions: Transaction[],
+  account: string,
+  activityRange: ActivityRange
+): AccountActivitySnapshot {
+  const normalizedAccount = account.trim().toLowerCase();
+  if (!normalizedAccount) {
+    return {
+      entries: [],
+      inflowCount: 0,
+      outflowCount: 0,
+      transferCount: 0,
+      totalMatches: 0,
+      lastActiveLabel: "No linked activity",
+      momentum: 0,
+      trendValues: [],
+      trendLabels: [],
+      hasHistoricalActivityOutsideRange: false,
+    };
+  }
+
+  const matchedAll = transactions
+    .filter(
+      (transaction) =>
+        matchesAccount(transaction.sourceAccount, normalizedAccount) ||
+        matchesAccount(transaction.destinationAccount, normalizedAccount)
+    )
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const rangeStart = getActivityRangeStart(activityRange);
+  const matched = rangeStart
+    ? matchedAll.filter((transaction) => {
+        const date = new Date(transaction.date);
+        if (Number.isNaN(date.getTime())) {
+          return false;
+        }
+        return date >= rangeStart;
+      })
+    : matchedAll;
+
+  const hasHistoricalActivityOutsideRange =
+    matchedAll.length > 0 && matched.length < matchedAll.length;
+
+  if (matched.length === 0) {
+    return {
+      entries: [],
+      inflowCount: 0,
+      outflowCount: 0,
+      transferCount: 0,
+      totalMatches: 0,
+      lastActiveLabel:
+        matchedAll.length > 0
+          ? `No activity in ${getActivityRangeLabel(activityRange)}`
+          : "No activity yet",
+      momentum: 0,
+      trendValues: [],
+      trendLabels: [],
+      hasHistoricalActivityOutsideRange,
+    };
+  }
+
+  let inflowCount = 0;
+  let outflowCount = 0;
+  let transferCount = 0;
+
+  const allEntries = matched.map((transaction) => {
+    const descriptor = describeAccountActivity(transaction, normalizedAccount);
+    if (descriptor.direction === "inflow") {
+      inflowCount += 1;
+    } else if (descriptor.direction === "outflow") {
+      outflowCount += 1;
+    } else {
+      transferCount += 1;
+    }
+
+    return {
+      transaction,
+      ...descriptor,
+    };
+  });
+
+  const trendSource = allEntries.slice(0, 12).reverse();
+  let runningMomentum = 0;
+  const trendValues = trendSource.map((entry) => {
+    if (entry.direction === "inflow") {
+      runningMomentum += 1;
+    } else if (entry.direction === "outflow") {
+      runningMomentum -= 1;
+    }
+    return runningMomentum;
+  });
+
+  const trendLabels = trendSource.map((entry) =>
+    formatTransactionDate(entry.transaction.date)
+  );
+
+  return {
+    entries: allEntries.slice(0, 6),
+    inflowCount,
+    outflowCount,
+    transferCount,
+    totalMatches: matched.length,
+    lastActiveLabel: formatTransactionDate(matched[0].date, true),
+    momentum: inflowCount - outflowCount,
+    trendValues,
+    trendLabels,
+    hasHistoricalActivityOutsideRange,
+  };
+}
+
+function getActivityRangeStart(range: ActivityRange): Date | null {
+  const days =
+    range === "7D" ? 7 : range === "30D" ? 30 : range === "90D" ? 90 : null;
+  if (!days) {
+    return null;
+  }
+
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  start.setDate(start.getDate() - (days - 1));
+  return start;
+}
+
+function getActivityRangeLabel(range: ActivityRange): string {
+  if (range === "ALL") {
+    return "All time";
+  }
+
+  return `Last ${range.toLowerCase()}`;
+}
+
+function matchesAccount(
+  account: string | null | undefined,
+  normalizedAccount: string
+): boolean {
+  return account?.trim().toLowerCase() === normalizedAccount;
+}
+
+function describeAccountActivity(
+  transaction: Transaction,
+  normalizedAccount: string
+): Omit<AccountActivityEntry, "transaction"> {
+  const source = transaction.sourceAccount?.trim() || "Unknown account";
+  const destination = transaction.destinationAccount?.trim() || "Unknown account";
+  const sourceMatches = matchesAccount(transaction.sourceAccount, normalizedAccount);
+  const destinationMatches = matchesAccount(
+    transaction.destinationAccount,
+    normalizedAccount
+  );
+
+  if (transaction.type === "TRANSFER") {
+    if (sourceMatches && !destinationMatches) {
+      return {
+        direction: "outflow",
+        headline: "Transfer sent",
+        detail: `Moved to ${destination}`,
+      };
+    }
+
+    if (destinationMatches && !sourceMatches) {
+      return {
+        direction: "inflow",
+        headline: "Transfer received",
+        detail: `Received from ${source}`,
+      };
+    }
+
+    return {
+      direction: "transfer",
+      headline: "Internal transfer",
+      detail: `${source} to ${destination}`,
+    };
+  }
+
+  if (transaction.type === "INCOME") {
+    return {
+      direction: "inflow",
+      headline: "Income recorded",
+      detail: transaction.note?.trim() || transaction.category,
+    };
+  }
+
+  return {
+    direction: "outflow",
+    headline: "Expense recorded",
+    detail: transaction.note?.trim() || transaction.category,
+  };
+}
+
+function AccountActivitySparkline({ values }: { values: number[] }) {
+  if (values.length === 0) {
+    return (
+      <div className="mt-2 rounded-xl border border-dashed border-slate-300 bg-white/70 px-3 py-4 text-center text-[11px] text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+        Not enough activity for a trend yet.
+      </div>
+    );
+  }
+
+  const coordinates = buildSparklineCoordinates(values);
+  const min = Math.min(...coordinates.map((point) => point.value));
+  const max = Math.max(...coordinates.map((point) => point.value));
+  const range = max - min || 1;
+  const zeroY = clampPercent(100 - ((0 - min) / range) * 100);
+  const linePoints = coordinates.map((point) => `${point.x},${point.y}`).join(" ");
+  const areaPath = `M ${coordinates[0].x} 100 ${coordinates
+    .map((point) => `L ${point.x} ${point.y}`)
+    .join(" ")} L ${coordinates[coordinates.length - 1].x} 100 Z`;
+
+  return (
+    <div className="mt-2 h-20 w-full overflow-hidden rounded-xl border border-slate-200 bg-white/85 px-2 py-2 dark:border-slate-700 dark:bg-slate-900/60">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
+        <defs>
+          <linearGradient id="activity-trend-fill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgb(14 165 233 / 0.35)" />
+            <stop offset="100%" stopColor="rgb(14 165 233 / 0)" />
+          </linearGradient>
+        </defs>
+        <line
+          x1="0"
+          x2="100"
+          y1={zeroY}
+          y2={zeroY}
+          stroke="rgb(148 163 184 / 0.45)"
+          strokeDasharray="3 3"
+        />
+        <path d={areaPath} fill="url(#activity-trend-fill)" />
+        <polyline
+          points={linePoints}
+          fill="none"
+          stroke="rgb(14 165 233)"
+          strokeWidth="2.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
+function buildSparklineCoordinates(values: number[]) {
+  const safeValues = values.length === 1 ? [values[0], values[0]] : values;
+  const min = Math.min(...safeValues);
+  const max = Math.max(...safeValues);
+  const range = max - min || 1;
+
+  return safeValues.map((value, index) => {
+    const denominator = safeValues.length - 1 || 1;
+    const x = (index / denominator) * 100;
+    const y = 100 - ((value - min) / range) * 100;
+    return { x, y, value };
+  });
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
