@@ -9,6 +9,7 @@ export const SUPPORTED_CURRENCIES = [
 ] as const;
 
 export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number];
+export type PreferredCurrency = SupportedCurrency;
 
 export type AssistantHistoryItem = {
   role: "user" | "assistant";
@@ -20,6 +21,8 @@ export type AssistantRequestBody = {
   preferredCurrency?: SupportedCurrency;
   history?: AssistantHistoryItem[];
 };
+
+export type AssistantRequest = AssistantRequestBody;
 
 export type AssistantSuccessPayload = {
   data: { reply: string };
