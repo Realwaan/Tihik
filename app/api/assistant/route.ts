@@ -1,25 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 
 import { auth } from "@/auth";
 import { convertCurrency, convertToUSD, formatCurrency } from "@/lib/currency";
 import { prisma } from "@/lib/prisma";
-
-const requestSchema = z.object({
-  message: z.string().trim().min(1).max(800),
-  preferredCurrency: z
-    .enum(["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "PHP"])
-    .optional(),
-  history: z
-    .array(
-      z.object({
-        role: z.enum(["user", "assistant"]),
-        content: z.string().trim().min(1).max(500),
-      })
-    )
-    .max(4)
-    .optional(),
-});
+import { requestSchema } from "./validation";
 
 const SYSTEM_INSTRUCTION = [
   "You are TrackIt AI, a concise in-app assistant for personal finance and app guidance.",
