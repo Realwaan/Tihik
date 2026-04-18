@@ -8,18 +8,21 @@ export const SUPPORTED_CURRENCIES = [
   "PHP",
 ] as const;
 
-export type PreferredCurrency = (typeof SUPPORTED_CURRENCIES)[number];
+export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number];
+export type PreferredCurrency = SupportedCurrency;
 
 export type AssistantHistoryItem = {
   role: "user" | "assistant";
   content: string;
 };
 
-export type AssistantRequest = {
+export type AssistantRequestBody = {
   message: string;
-  preferredCurrency?: PreferredCurrency;
+  preferredCurrency?: SupportedCurrency;
   history?: AssistantHistoryItem[];
 };
+
+export type AssistantRequest = AssistantRequestBody;
 
 export type AssistantSuccessPayload = {
   data: { reply: string };
