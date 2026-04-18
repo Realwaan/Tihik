@@ -54,7 +54,6 @@ export async function sendVerificationEmail(email: string, token: string) {
   );
 
   if (!hasSmtpConfig) {
-    console.info("Email verification link", { email: normalizedEmail, verifyUrl });
     return {
       delivered: false,
       verifyUrl,
