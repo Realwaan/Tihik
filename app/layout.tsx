@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PwaRegister } from "@/components/pwa-register";
 import { KeyboardFocusAssist } from "@/components/keyboard-focus-assist";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const viewport = {
   width: "device-width",
@@ -49,6 +50,7 @@ export default function RootLayout({
             <KeyboardFocusAssist />
             {children}
             <AiAssistantWidget />
+            <SpeedInsights />
           </ToastProvider>
         </ThemeProvider>
         <Analytics />

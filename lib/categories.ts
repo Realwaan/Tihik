@@ -6,7 +6,9 @@ export const PH_LOCAL_WALLET_CATEGORIES = [
   "ShopeePay",
   "Coins.ph",
   "PalawanPay",
+  "Bayad App",
   "DiskarTech",
+  "Maribank",
 ] as const;
 
 export const PH_BANK_WALLET_CATEGORIES = [
@@ -20,10 +22,20 @@ export const PH_BANK_WALLET_CATEGORIES = [
   "PNB",
   "Chinabank",
   "EastWest",
+  "PSBank",
+  "DBP",
+  "AUB",
+  "Maybank",
+  "HSBC",
+  "Bank of Commerce",
+  "Sterling Bank of Asia",
   "SeaBank",
   "Tonik",
   "UNO Bank",
   "KOMO",
+  "BancNet",
+  "Cirrus",
+  "Visa Plus",
 ] as const;
 
 export const PREMADE_EXPENSE_CATEGORIES = [
