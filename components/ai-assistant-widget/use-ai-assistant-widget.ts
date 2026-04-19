@@ -3,6 +3,73 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { initialMessage } from "./ai-assistant-widget-helpers";
 import type { AssistantCurrency, ChatMessage } from "./ai-assistant-widget-types";
 
+const AI_HISTORY_STORAGE_PREFIX = "trackit-ai-history-v1";
+const MAX_STORED_MESSAGES = 60;
+const MAX_STORED_CONTENT_LENGTH = 4000;
+
+function buildHistoryStorageKey(userId: string | null): string {
+  return `${AI_HISTORY_STORAGE_PREFIX}:${userId?.trim() || "guest"}`;
+}
+
+function normalizeStoredMessages(raw: unknown): ChatMessage[] {
+  if (!Array.isArray(raw)) {
+    return [initialMessage];
+  }
+
+  const restored = raw
+    .map((item, index): ChatMessage | null => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const record = item as Record<string, unknown>;
+      const role =
+        record.role === "assistant" || record.role === "user" ? record.role : null;
+      const content =
+        typeof record.content === "string"
+          ? record.content.trim().slice(0, MAX_STORED_CONTENT_LENGTH)
+          : "";
+
+      if (!role || !content) {
+        return null;
+      }
+
+      const id =
+        typeof record.id === "string" && record.id.trim().length > 0
+          ? record.id
+          : `restored-${role}-${index}`;
+
+      return {
+        id,
+        role,
+        content,
+      };
+    })
+    .filter((item): item is ChatMessage => Boolean(item));
+
+  if (restored.length === 0) {
+    return [initialMessage];
+  }
+
+  return restored.slice(-MAX_STORED_MESSAGES);
+}
+
+function compactMessagesForStorage(messages: ChatMessage[]): ChatMessage[] {
+  return messages.slice(-MAX_STORED_MESSAGES).map((message) => ({
+    ...message,
+    content: message.content.slice(0, MAX_STORED_CONTENT_LENGTH),
+  }));
+}
+
+function createMessageId(role: ChatMessage["role"], variant: string): string {
+  const random =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2, 10);
+
+  return `${Date.now()}-${role}-${variant}-${random}`;
+}
+
 export function useAiAssistantWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -11,8 +78,10 @@ export function useAiAssistantWidget() {
   const [dictationSupported, setDictationSupported] = useState(false);
   const [dictating, setDictating] = useState(false);
   const [preferredCurrency, setPreferredCurrency] = useState<AssistantCurrency>("USD");
+  const [historyStorageKey, setHistoryStorageKey] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const speechRecognitionRef = useRef<any>(null);
+  const historyHydratedRef = useRef(false);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -20,19 +89,67 @@ export function useAiAssistantWidget() {
 
   useEffect(() => {
     async function loadPreference() {
+      let resolvedUserId: string | null = null;
+
       try {
         const response = await fetch("/api/user/profile");
-        if (!response.ok) return;
-        const json = await response.json();
-        const currency = (json.user?.preferredCurrency ?? "USD") as AssistantCurrency;
-        setPreferredCurrency(currency);
+        if (response.ok) {
+          const json = await response.json();
+          const currency = (json.user?.preferredCurrency ?? "USD") as AssistantCurrency;
+          setPreferredCurrency(currency);
+          resolvedUserId =
+            typeof json.user?.id === "string" ? json.user.id : null;
+        }
       } catch {
         // ignore profile fetch errors for chat boot
+      } finally {
+        setHistoryStorageKey(buildHistoryStorageKey(resolvedUserId));
       }
     }
 
     loadPreference();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !historyStorageKey) {
+      return;
+    }
+
+    historyHydratedRef.current = false;
+
+    try {
+      const raw = window.localStorage.getItem(historyStorageKey);
+      if (!raw) {
+        setMessages([initialMessage]);
+      } else {
+        const parsed = JSON.parse(raw) as unknown;
+        setMessages(normalizeStoredMessages(parsed));
+      }
+    } catch {
+      setMessages([initialMessage]);
+    } finally {
+      historyHydratedRef.current = true;
+    }
+  }, [historyStorageKey]);
+
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      !historyStorageKey ||
+      !historyHydratedRef.current
+    ) {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        historyStorageKey,
+        JSON.stringify(compactMessagesForStorage(messages))
+      );
+    } catch {
+      // ignore storage write errors
+    }
+  }, [messages, historyStorageKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -99,7 +216,7 @@ export function useAiAssistantWidget() {
     }
 
     const userMessage: ChatMessage = {
-      id: `${Date.now()}-user`,
+      id: createMessageId("user", "input"),
       role: "user",
       content: text,
     };
@@ -128,7 +245,7 @@ export function useAiAssistantWidget() {
         setMessages((current) => [
           ...current,
           {
-            id: `${Date.now()}-assistant-error`,
+            id: createMessageId("assistant", "error"),
             role: "assistant",
             content: errorMessage,
           },
@@ -139,7 +256,7 @@ export function useAiAssistantWidget() {
       setMessages((current) => [
         ...current,
         {
-          id: `${Date.now()}-assistant`,
+          id: createMessageId("assistant", "reply"),
           role: "assistant",
           content: json.data.reply,
         },
@@ -148,7 +265,7 @@ export function useAiAssistantWidget() {
       setMessages((current) => [
         ...current,
         {
-          id: `${Date.now()}-assistant-fallback`,
+          id: createMessageId("assistant", "fallback"),
           role: "assistant",
           content: "Network issue detected. Please try again in a moment.",
         },
@@ -181,6 +298,20 @@ export function useAiAssistantWidget() {
     }
   }
 
+  function clearHistory() {
+    setMessages([initialMessage]);
+
+    if (typeof window === "undefined" || !historyStorageKey) {
+      return;
+    }
+
+    try {
+      window.localStorage.removeItem(historyStorageKey);
+    } catch {
+      // ignore storage delete errors
+    }
+  }
+
   return {
     open,
     setOpen,
@@ -193,5 +324,6 @@ export function useAiAssistantWidget() {
     scrollRef,
     sendMessage,
     toggleDictation,
+    clearHistory,
   };
 }

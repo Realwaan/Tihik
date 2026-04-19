@@ -10,6 +10,7 @@ import type {
 import {
   ACCOUNT_OVERVIEW_ORDER_STORAGE_KEY,
   computeDebitNetWorth,
+  isTransactionLinkedToAccount,
 } from "./account-overview-utils";
 
 export function useAccountOverview() {
@@ -236,13 +237,9 @@ export function useAccountOverview() {
       return transactions;
     }
 
-    const normalized = selectedAccount.trim().toLowerCase();
-    return transactions.filter((item) => {
-      const source = item.sourceAccount?.trim().toLowerCase() ?? "";
-      const destination = item.destinationAccount?.trim().toLowerCase() ?? "";
-      const category = item.category.trim().toLowerCase();
-      return source === normalized || destination === normalized || category === normalized;
-    });
+    return transactions.filter((item) =>
+      isTransactionLinkedToAccount(item, selectedAccount)
+    );
   }, [transactions, selectedAccount]);
 
   async function handleDelete(id: string) {
@@ -337,6 +334,7 @@ export function useAccountOverview() {
 
   return {
     loading,
+    transactions,
     preferredCurrency,
     selectedAccount,
     setSelectedAccount,
