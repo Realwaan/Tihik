@@ -12,6 +12,7 @@ export type Transaction = {
   destinationAccount?: string | null;
   note?: string | null;
   date: string;
+  createdAt?: string;
 };
 
 export type DashboardData = {

@@ -21,6 +21,7 @@ export function AiAssistantWidget() {
     scrollRef,
     sendMessage,
     toggleDictation,
+    clearHistory,
   } = useAiAssistantWidget();
 
   return (
@@ -40,14 +41,24 @@ export function AiAssistantWidget() {
                 <p className="text-xs text-slate-500 dark:text-slate-400">Smart finance assistant</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-              aria-label="Close assistant"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={clearHistory}
+                className="rounded-lg px-2 py-1 text-[11px] font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                aria-label="Clear conversation history"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                aria-label="Close assistant"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </header>
 
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">

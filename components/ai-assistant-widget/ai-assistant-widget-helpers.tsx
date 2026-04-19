@@ -19,7 +19,7 @@ export function renderFormattedText(content: string) {
   return lines.map((line, lineIndex) => {
     const parts = line.split(/(\*\*[^*]+\*\*)/g);
     return (
-      <>
+      <span key={`line-${lineIndex}`}>
         {parts.map((part, partIndex) => {
           const isBold = part.startsWith("**") && part.endsWith("**") && part.length > 4;
           if (!isBold) {
@@ -33,7 +33,7 @@ export function renderFormattedText(content: string) {
           );
         })}
         {lineIndex < lines.length - 1 ? <br /> : null}
-      </>
+      </span>
     );
   });
 }

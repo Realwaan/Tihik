@@ -61,7 +61,7 @@
 @layer components {
   .page-transition-shell {
     animation: page-enter 180ms ease-out both;
-    will-change: transform, opacity;
+    will-change: opacity;
   }
 
   .page-shell {

@@ -18,13 +18,16 @@ import {
 } from "recharts";
 import MuiSkeleton from "@mui/material/Skeleton";
 
+import { AccountOverviewCardTransactionsModal } from "@/components/account-overview/account-overview-card-transactions-modal";
+import { isTransactionLinkedToAccount } from "@/components/account-overview/account-overview-utils";
 import { SignOutButton } from "@/components/auth-buttons";
 import { MobileNavDock } from "@/components/mobile-nav-dock";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { WalletBrandLogo } from "@/components/ui/wallet-brand-logo";
 import { WalletCategoryBadge } from "@/components/ui/wallet-category-badge";
-import { WalletLogoDot } from "@/components/ui/wallet-logo-dot";
 import { getAccountCardTheme } from "@/lib/account-card-theme";
+import { isCreditCardLikeAccount } from "@/lib/bank-account-eligibility";
 import { getWalletBadge } from "@/lib/wallet-badges";
 
 type DashboardData = {
@@ -115,6 +118,19 @@ type TransactionLite = {
   destinationAccount?: string | null;
 };
 
+type AccountTransaction = {
+  id: string;
+  amount: number;
+  currency: Currency;
+  type: "INCOME" | "EXPENSE" | "TRANSFER";
+  category: string;
+  sourceAccount?: string | null;
+  destinationAccount?: string | null;
+  note?: string | null;
+  date: string;
+  createdAt?: string;
+};
+
 type NotificationPreferences = {
   budgetNearEnabled: boolean;
   budgetOverEnabled: boolean;
@@ -126,6 +142,21 @@ type NotificationPreferences = {
 const palette = ["#f59e0b", "#3b82f6", "#8b5cf6", "#14b8a6", "#ef4444", "#22c55e"];
 const READ_NOTIFICATIONS_STORAGE_KEY = "trackit.notifications.read.v1";
 const ACCOUNT_ORDER_STORAGE_KEY = "trackit.dashboard.account-order.v1";
+
+function toPseudoCardNumber(seed: string) {
+  const digits = Array.from(seed).map((char) => char.charCodeAt(0) % 10);
+  const padded = [...digits, 5, 2, 8, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 8].slice(0, 16);
+  return `${padded.slice(0, 4).join("")} ${padded.slice(4, 8).join("")} ${padded
+    .slice(8, 12)
+    .join("")} ${padded.slice(12, 16).join("")}`;
+}
+
+function toPseudoExpiry(seed: string) {
+  const digits = Array.from(seed).map((char) => char.charCodeAt(0));
+  const month = ((digits[0] ?? 9) % 12) + 1;
+  const year = ((digits[1] ?? 25) % 7) + 25;
+  return `${String(month).padStart(2, "0")}/${String(year).padStart(2, "0")}`;
+}
 
 function Skeleton(props: React.ComponentProps<typeof MuiSkeleton>) {
   const { sx, ...rest } = props;
@@ -161,6 +192,10 @@ export function DashboardDashboard() {
   const [accountOrder, setAccountOrder] = useState<string[]>([]);
   const [draggingAccountId, setDraggingAccountId] = useState<string | null>(null);
   const [openAccountMenuId, setOpenAccountMenuId] = useState<string | null>(null);
+  const [selectedAccountCardId, setSelectedAccountCardId] = useState<string | null>(null);
+  const [allAccountTransactions, setAllAccountTransactions] = useState<AccountTransaction[] | null>(null);
+  const [loadingAccountTransactions, setLoadingAccountTransactions] = useState(false);
+  const [accountTransactionsError, setAccountTransactionsError] = useState<string | null>(null);
   const [previousDebitNetWorth, setPreviousDebitNetWorth] = useState<number | null>(null);
   const notificationsRef = useRef<HTMLDivElement | null>(null);
 
@@ -365,6 +400,19 @@ export function DashboardDashboard() {
       }),
     [orderedAccountCards, accountView]
   );
+  const selectedAccountCard = useMemo(
+    () => accountCards.find((item) => item.id === selectedAccountCardId) ?? null,
+    [accountCards, selectedAccountCardId]
+  );
+  const selectedAccountTransactions = useMemo(() => {
+    if (!selectedAccountCard || !allAccountTransactions) {
+      return [];
+    }
+
+    return allAccountTransactions.filter((item) =>
+      isTransactionLinkedToAccount(item, selectedAccountCard.category)
+    );
+  }, [allAccountTransactions, selectedAccountCard]);
   const debitNetWorth = useMemo(
     () => accountCards.filter((item) => item.balance >= 0).reduce((sum, item) => sum + item.balance, 0),
     [accountCards]
@@ -437,6 +485,36 @@ export function DashboardDashboard() {
     } finally {
       setLoadingNotifications(false);
     }
+  }
+
+  async function ensureAccountTransactionsLoaded() {
+    if (allAccountTransactions || loadingAccountTransactions) {
+      return;
+    }
+
+    try {
+      setLoadingAccountTransactions(true);
+      setAccountTransactionsError(null);
+
+      const response = await fetch("/api/transactions");
+      if (!response.ok) {
+        throw new Error("Failed to load transactions");
+      }
+
+      const json = (await response.json()) as { data?: AccountTransaction[] };
+      setAllAccountTransactions((json.data ?? []) as AccountTransaction[]);
+    } catch {
+      setAccountTransactionsError("Unable to load account transactions right now.");
+      setAllAccountTransactions(null);
+    } finally {
+      setLoadingAccountTransactions(false);
+    }
+  }
+
+  function openAccountTransactionsModal(accountId: string) {
+    setSelectedAccountCardId(accountId);
+    setOpenAccountMenuId(null);
+    void ensureAccountTransactionsLoaded();
   }
 
   async function loadNotificationPreferences() {
@@ -940,6 +1018,12 @@ export function DashboardDashboard() {
                 >
                   Account overview
                 </a>
+                <a
+                  href="/bank"
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  Bank API
+                </a>
               </div>
 
               <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -968,9 +1052,9 @@ export function DashboardDashboard() {
                 </div>
               ) : null}
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 justify-center gap-2 sm:[grid-template-columns:repeat(auto-fit,minmax(300px,360px))]">
                 {filteredAccountCards.length === 0 ? (
-                  <div className="sm:col-span-2 rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                  <div className="col-span-full rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
                     No account balances for this filter yet.
                   </div>
                 ) : (
@@ -992,11 +1076,30 @@ export function DashboardDashboard() {
                         : account.group === "ewallet"
                           ? Smartphone
                           : Landmark;
+                    const isCreditCardAccount = isCreditCardLikeAccount(account.category);
+                    const pseudoNumber = isCreditCardAccount
+                      ? toPseudoCardNumber(`${account.id}:${account.category}`)
+                      : null;
+                    const pseudoExpiry = isCreditCardAccount
+                      ? toPseudoExpiry(`${account.category}:${account.group}`)
+                      : null;
 
                     return (
                       <article
                         key={account.id}
                         draggable
+                        onClick={(event) => {
+                          const target = event.target as HTMLElement;
+                          if (target.closest("button,a,input,select,textarea")) {
+                            return;
+                          }
+
+                          if (draggingAccountId) {
+                            return;
+                          }
+
+                          openAccountTransactionsModal(account.id);
+                        }}
                         onDragStart={() => {
                           setDraggingAccountId(account.id);
                           setOpenAccountMenuId(null);
@@ -1013,56 +1116,50 @@ export function DashboardDashboard() {
                           setDraggingAccountId(null);
                         }}
                         onDragEnd={() => setDraggingAccountId(null)}
-                        className={`relative min-h-[196px] cursor-move overflow-hidden rounded-3xl border p-4 transition-all duration-300 ease-out sm:p-5 ${cardTheme.cardClass} ${
+                        className={`relative aspect-[1.586/1] w-full max-w-none cursor-pointer overflow-hidden rounded-[28px] border p-4 transition-all duration-300 ease-out sm:cursor-grab sm:p-5 ${cardTheme.cardClass} ${
                           accountCardsAnimated
                             ? "translate-y-0 scale-100 opacity-100"
                             : "translate-y-2 scale-[0.98] opacity-0"
                         } ${draggingAccountId === account.id ? "ring-2 ring-white/40 opacity-80" : ""}`}
                       >
+                        <span className="pointer-events-none absolute -left-16 -top-20 h-48 w-48 rounded-full bg-white/10" />
+                        <span className="pointer-events-none absolute -bottom-24 -left-10 h-56 w-56 rounded-full bg-black/10" />
+                        <span className="pointer-events-none absolute -right-8 -top-16 h-44 w-44 rounded-full bg-white/10" />
                         <div className="flex items-start justify-between gap-3">
-                          <div className="inline-flex min-w-0 items-start gap-3">
-                            {badge ? (
-                              <WalletLogoDot
-                                badge={badge}
-                                label={account.category}
-                                sizeClass="h-11 w-11"
-                                textClass="text-[10px]"
-                                imageClassName="absolute inset-[2px] h-[calc(100%-4px)] w-[calc(100%-4px)] rounded-full bg-white object-contain p-[2px]"
-                              />
-                            ) : (
-                              <span
-                                className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ${cardTheme.fallbackLogoClass}`}
-                              >
-                                <Icon className="h-5 w-5" />
-                              </span>
-                            )}
-                            <div className="min-w-0">
-                              <p className={`truncate text-xl font-semibold tracking-[0.02em] ${cardTheme.titleClass}`}>{account.category}</p>
-                              <p className={`text-sm ${cardTheme.subtitleClass}`}>
-                                {account.balance >= 0 ? "Debit" : "Credit"} • {preferredCurrency}
-                              </p>
-                            </div>
+                          <div className="min-w-0">
+                            <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${cardTheme.balanceLabelClass}`}>
+                              Current Balance
+                            </p>
+                            <p className={`mt-1 truncate text-3xl font-semibold tracking-tight ${cardTheme.balanceValueClass}`}>
+                              {formatCurrency(account.balance, preferredCurrency)}
+                            </p>
+                            <p className={`mt-1 truncate text-xs font-medium ${cardTheme.subtitleClass}`}>
+                              {account.category}
+                            </p>
                           </div>
-                          <div className="relative inline-flex items-center gap-1">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${cardTheme.pillClass}`}
-                            >
-                              {groupLabel}
-                            </span>
-                            <button
-                              type="button"
-                              aria-label="Account card actions"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                setOpenAccountMenuId((current) =>
-                                  current === account.id ? null : account.id
-                                );
-                              }}
-                              className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${cardTheme.pillClass}`}
-                            >
-                              <MoreHorizontal className="h-3.5 w-3.5" />
-                            </button>
+                          <div className="relative inline-flex flex-col items-end gap-2">
+                            <WalletBrandLogo badge={badge} label={account.category} />
+                            <div className="inline-flex items-center gap-1">
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${cardTheme.pillClass}`}
+                              >
+                                {groupLabel}
+                              </span>
+                              <button
+                                type="button"
+                                aria-label="Account card actions"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  setOpenAccountMenuId((current) =>
+                                    current === account.id ? null : account.id
+                                  );
+                                }}
+                                className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${cardTheme.pillClass}`}
+                              >
+                                <MoreHorizontal className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                             {openAccountMenuId === account.id ? (
                               <div
                                 className="absolute right-0 top-9 z-20 min-w-[9.5rem] rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900"
@@ -1116,13 +1213,27 @@ export function DashboardDashboard() {
                             ) : null}
                           </div>
                         </div>
-                        <div className="mt-8">
-                          <p className={`text-xs font-semibold uppercase tracking-[0.14em] ${cardTheme.balanceLabelClass}`}>Balance</p>
-                          <p className={`mt-1 text-4xl font-semibold tracking-tight ${cardTheme.balanceValueClass}`}>
-                            {formatCurrency(account.balance, preferredCurrency)}
-                          </p>
+                        <div className="mt-6 flex items-end justify-between gap-3 pr-11">
+                          {isCreditCardAccount ? (
+                            <>
+                              <p className={`text-lg font-medium tracking-[0.06em] ${cardTheme.titleClass}`}>{pseudoNumber}</p>
+                              <div className="text-right">
+                                <p className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${cardTheme.balanceLabelClass}`}>
+                                  Valid Thru
+                                </p>
+                                <p className={`text-lg font-semibold ${cardTheme.titleClass}`}>{pseudoExpiry}</p>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <p className={`text-xs font-semibold uppercase tracking-[0.14em] ${cardTheme.balanceLabelClass}`}>
+                                Non-credit account
+                              </p>
+                              <p className={`text-sm font-semibold ${cardTheme.titleClass}`}>{groupLabel}</p>
+                            </>
+                          )}
                         </div>
-                        <Icon className={`pointer-events-none absolute bottom-3 right-3 h-14 w-14 ${cardTheme.watermarkClass}`} />
+                        <Icon className={`pointer-events-none absolute bottom-3 right-3 h-8 w-8 sm:h-9 sm:w-9 ${cardTheme.watermarkClass}`} />
                       </article>
                     );
                   })
@@ -1429,6 +1540,22 @@ export function DashboardDashboard() {
           </>
         )}
       </div>
+
+      {selectedAccountCard ? (
+        <AccountOverviewCardTransactionsModal
+          account={{
+            id: selectedAccountCard.id,
+            account: selectedAccountCard.category,
+            balance: selectedAccountCard.balance,
+            group: selectedAccountCard.group,
+          }}
+          transactions={selectedAccountTransactions}
+          preferredCurrency={preferredCurrency}
+          loading={loadingAccountTransactions && allAccountTransactions === null}
+          errorMessage={accountTransactionsError}
+          onClose={() => setSelectedAccountCardId(null)}
+        />
+      ) : null}
       <MobileNavDock />
     </main>
   );

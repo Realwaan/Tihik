@@ -1,8 +1,11 @@
+import { useEffect, useMemo, useState } from "react";
 import { Copy, Loader2, Trash2, WalletCards } from "lucide-react";
 import Skeleton from "@mui/material/Skeleton";
 
 import type { Transaction } from "./account-overview-types";
 import { formatCurrency } from "./account-overview-utils";
+
+const TRANSACTIONS_PER_PAGE = 5;
 
 type AccountOverviewHistoryProps = {
   loading: boolean;
@@ -21,6 +24,35 @@ export function AccountOverviewHistory({
   onDelete,
   onDuplicate,
 }: AccountOverviewHistoryProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredTransactions.length / TRANSACTIONS_PER_PAGE)),
+    [filteredTransactions.length]
+  );
+
+  const pagedTransactions = useMemo(() => {
+    const start = (currentPage - 1) * TRANSACTIONS_PER_PAGE;
+    return filteredTransactions.slice(start, start + TRANSACTIONS_PER_PAGE);
+  }, [filteredTransactions, currentPage]);
+
+  const pageStartIndex =
+    filteredTransactions.length === 0
+      ? 0
+      : (currentPage - 1) * TRANSACTIONS_PER_PAGE + 1;
+  const pageEndIndex =
+    filteredTransactions.length === 0
+      ? 0
+      : Math.min(currentPage * TRANSACTIONS_PER_PAGE, filteredTransactions.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredTransactions.length]);
+
+  useEffect(() => {
+    setCurrentPage((previous) => Math.min(previous, totalPages));
+  }, [totalPages]);
+
   return (
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/60">
       <div className="mb-4 flex items-center gap-2">
@@ -45,8 +77,8 @@ export function AccountOverviewHistory({
           No account-level transactions found for this filter.
         </div>
       ) : (
-        <div className="max-h-[30rem] space-y-2 overflow-y-auto pr-1">
-          {filteredTransactions.map((transaction) => (
+        <div className="space-y-2">
+          {pagedTransactions.map((transaction) => (
             <article
               key={transaction.id}
               className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 px-3 py-3 dark:border-slate-700"
@@ -98,6 +130,37 @@ export function AccountOverviewHistory({
               </div>
             </article>
           ))}
+
+          <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-center text-xs text-slate-500 dark:text-slate-400 sm:text-left">
+              Showing {pageStartIndex}-{pageEndIndex} of {filteredTransactions.length} transactions.
+            </p>
+            {totalPages > 1 ? (
+              <div className="inline-flex items-center justify-center gap-2 self-center sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((previous) => Math.max(1, previous - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  Previous
+                </button>
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((previous) => Math.min(totalPages, previous + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
     </div>
