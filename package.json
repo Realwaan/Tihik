@@ -13,10 +13,7 @@
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "transactions:backfill-accounts": "node scripts/backfill-transaction-accounts.mjs",
-    "bank:env:check": "node scripts/check-bank-env.mjs",
-    "bank:mock-provider": "node scripts/mock-bank-provider.mjs",
-    "bank:test:sample": "npx --yes tsx scripts/bank-integration-smoke-test.ts"
+    "transactions:backfill-accounts": "node scripts/backfill-transaction-accounts.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",

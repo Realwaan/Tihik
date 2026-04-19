@@ -1018,12 +1018,6 @@ export function DashboardDashboard() {
                 >
                   Account overview
                 </a>
-                <a
-                  href="/bank"
-                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                  Bank API
-                </a>
               </div>
 
               <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
