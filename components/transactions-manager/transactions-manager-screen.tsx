@@ -81,6 +81,21 @@ type AccountActivitySnapshot = {
   hasHistoricalActivityOutsideRange: boolean;
 };
 
+type ReceiptPiiEntity = {
+  label?: string;
+  text?: string;
+  score?: number | null;
+};
+
+type ReceiptPiiResponse = {
+  data?: {
+    redactedText?: string;
+    entities?: ReceiptPiiEntity[];
+    redactedCount?: number;
+    warning?: string;
+  };
+};
+
 const initialForm: TransactionFormState = {
   amount: "",
   currency: "USD",
@@ -96,7 +111,7 @@ const accountOptions = Array.from(
   new Set([...ACCOUNT_TEMPLATE_CATEGORIES])
 ).sort((a, b) => a.localeCompare(b));
 
-const TRANSACTIONS_PER_PAGE = 10;
+const TRANSACTIONS_PER_PAGE = 5;
 
 const ACTIVITY_RANGE_OPTIONS: Array<{
   value: ActivityRange;
@@ -139,6 +154,45 @@ export function TransactionsManager() {
   const [activityAccount, setActivityAccount] = useState("");
   const [activityRange, setActivityRange] = useState<ActivityRange>("30D");
   const [activityVisualReady, setActivityVisualReady] = useState(true);
+
+  async function redactReceiptText(text: string) {
+    try {
+      const response = await fetch("/api/transactions/receipt-pii", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        return {
+          text,
+          redactedCount: 0,
+          warning: "PII scan was unavailable. OCR parsing continued.",
+        };
+      }
+
+      const json = (await response.json()) as ReceiptPiiResponse;
+
+      return {
+        text: json.data?.redactedText?.trim() || text,
+        redactedCount:
+          typeof json.data?.redactedCount === "number"
+            ? json.data.redactedCount
+            : Array.isArray(json.data?.entities)
+              ? json.data.entities.length
+              : 0,
+        warning: json.data?.warning,
+      };
+    } catch {
+      return {
+        text,
+        redactedCount: 0,
+        warning: "PII scan failed. OCR parsing continued.",
+      };
+    }
+  }
 
   async function loadTransactions() {
     try {
@@ -697,19 +751,37 @@ export function TransactionsManager() {
       const { data } = await worker.recognize(imageDataUrl);
       await worker.terminate();
 
-      const parsed = parseReceiptText(data.text, form.currency);
+      const piiScan = await redactReceiptText(data.text || "");
+
+      if (piiScan.warning) {
+        showToast("warning", piiScan.warning);
+      }
+
+      const parsed = parseReceiptText(piiScan.text, form.currency);
+      const merchantLabel =
+        parsed.merchant && !parsed.merchant.includes("REDACTED")
+          ? parsed.merchant
+          : undefined;
+
       setForm((current) => ({
         ...current,
         amount: parsed.amount ? parsed.amount.toFixed(2) : current.amount,
         category: parsed.category ?? current.category,
         date: parsed.date ?? current.date,
         note:
-          parsed.merchant && !current.note
-            ? `Receipt: ${parsed.merchant}`
+          merchantLabel && !current.note
+            ? `Receipt: ${merchantLabel}`
             : current.note,
       }));
 
-      showToast("success", "Receipt analyzed. Please review detected fields.");
+      showToast(
+        "success",
+        `Receipt analyzed.${
+          piiScan.redactedCount > 0
+            ? ` ${piiScan.redactedCount} sensitive value${piiScan.redactedCount === 1 ? "" : "s"} redacted.`
+            : ""
+        } Please review detected fields.`
+      );
     } catch {
       showToast("error", "Receipt analysis failed. Please enter details manually.");
     } finally {
@@ -819,10 +891,6 @@ export function TransactionsManager() {
       ? 0
       : Math.min(currentPage * TRANSACTIONS_PER_PAGE, filteredTransactions.length);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, filterType]);
-
   const selectedTransactionAccounts = useMemo(
     () => getTransactionAccounts(selectedTransaction),
     [selectedTransaction]
@@ -846,6 +914,10 @@ export function TransactionsManager() {
 
     return buildAccountActivitySnapshot(transactions, activityAccount, activityRange);
   }, [transactions, activityAccount, activityRange]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterType]);
 
   useEffect(() => {
     setCurrentPage((previous) => {
@@ -908,6 +980,95 @@ export function TransactionsManager() {
       window.clearTimeout(timeoutId);
     };
   }, [activityRange, activityAccount, selectedTransaction?.id]);
+
+  function renderTransactionRow(transaction: Transaction, compact = false) {
+    return (
+      <article
+        key={transaction.id}
+        role="button"
+        tabIndex={0}
+        onClick={() => setSelectedTransaction(transaction)}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) {
+            return;
+          }
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setSelectedTransaction(transaction);
+          }
+        }}
+        className={`flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 transition-colors hover:border-blue-200 hover:bg-blue-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-950/50 dark:hover:border-blue-800 dark:hover:bg-blue-900/20 ${
+          compact ? "px-3 py-3" : "px-4 py-4"
+        }`}
+        aria-label={`View details for ${transaction.category} ${transaction.type.toLowerCase()} transaction`}
+      >
+        <div>
+          <div className="flex items-center gap-3">
+            <p className="font-medium text-slate-900 dark:text-slate-100">{transaction.category}</p>
+            <span
+              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                transaction.type === "INCOME"
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                  : transaction.type === "EXPENSE"
+                    ? "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
+                    : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+              }`}
+            >
+              {transaction.type}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {getTransactionSummary(transaction)}
+          </p>
+        </div>
+        <div className={`flex items-center ${compact ? "gap-2" : "gap-4"}`}>
+          <p
+            className={`text-sm font-semibold ${
+              transaction.type === "INCOME"
+                ? "text-emerald-700 dark:text-emerald-400"
+                : transaction.type === "EXPENSE"
+                  ? "text-rose-700 dark:text-rose-400"
+                  : "text-amber-700 dark:text-amber-400"
+            }`}
+          >
+            {transaction.type === "INCOME"
+              ? "+"
+              : transaction.type === "EXPENSE"
+                ? "-"
+                : "↔ "}
+            {formatTransactionAmount(transaction)}
+          </p>
+          <button
+            type="button"
+            disabled={duplicatingId === transaction.id}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleDuplicate(transaction.id);
+            }}
+            className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-400 dark:hover:border-amber-800 dark:hover:bg-amber-900/30 dark:hover:text-amber-300"
+            aria-label="Duplicate transaction"
+          >
+            {duplicatingId === transaction.id ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Copy className="h-4 w-4" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleDelete(transaction.id);
+            }}
+            className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-red-800 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+            aria-label="Delete transaction"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
@@ -1309,86 +1470,7 @@ export function TransactionsManager() {
             </div>
           ) : (
             <div className="space-y-3">
-              {pagedTransactions.map((transaction) => (
-                <article
-                  key={transaction.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedTransaction(transaction)}
-                  onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget) {
-                      return;
-                    }
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      setSelectedTransaction(transaction);
-                    }
-                  }}
-                  className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 px-4 py-4 transition-colors hover:border-blue-200 hover:bg-blue-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:border-slate-700 dark:bg-slate-950/50 dark:hover:border-blue-800 dark:hover:bg-blue-900/20"
-                  aria-label={`View details for ${transaction.category} ${transaction.type.toLowerCase()} transaction`}
-                >
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <p className="font-medium text-slate-900 dark:text-slate-100">{transaction.category}</p>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                        transaction.type === "INCOME"
-                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                          : transaction.type === "EXPENSE"
-                            ? "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
-                            : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                      }`}>
-                        {transaction.type}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      {getTransactionSummary(transaction)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <p className={`text-sm font-semibold ${
-                      transaction.type === "INCOME"
-                        ? "text-emerald-700 dark:text-emerald-400"
-                        : transaction.type === "EXPENSE"
-                          ? "text-rose-700 dark:text-rose-400"
-                          : "text-amber-700 dark:text-amber-400"
-                    }`}>
-                      {transaction.type === "INCOME"
-                        ? "+"
-                        : transaction.type === "EXPENSE"
-                          ? "-"
-                          : "↔ "}
-                      {formatTransactionAmount(transaction)}
-                    </p>
-                    <button
-                      type="button"
-                      disabled={duplicatingId === transaction.id}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleDuplicate(transaction.id);
-                      }}
-                       className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-400 dark:hover:border-amber-800 dark:hover:bg-amber-900/30 dark:hover:text-amber-300"
-                      aria-label="Duplicate transaction"
-                    >
-                      {duplicatingId === transaction.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleDelete(transaction.id);
-                      }}
-                       className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:text-slate-400 dark:hover:border-red-800 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                      aria-label="Delete transaction"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </article>
-              ))}
+              {pagedTransactions.map((transaction) => renderTransactionRow(transaction))}
               {filteredTransactions.length > 0 ? (
                 <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-center text-xs text-slate-500 dark:text-slate-400 sm:text-left">

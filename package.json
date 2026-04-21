@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "postinstall": "prisma generate",
     "predev": "node scripts/start-postgres.mjs",
     "dev": "next dev",
     "dev:auto": "start http://localhost:3000/signin && npm run dev",
     "web:dev": "npm run dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "transactions:backfill-accounts": "node scripts/backfill-transaction-accounts.mjs"

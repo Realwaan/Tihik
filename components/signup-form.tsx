@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, User, ArrowRight } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
@@ -227,12 +228,12 @@ export function SignupForm() {
         <div className="mt-6 text-center">
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Already have an account?{" "}
-            <a 
-              href="/" 
+            <Link
+              href="/"
               className="font-semibold text-blue-600 transition-colors hover:text-blue-700 focus:outline-none focus:underline dark:text-blue-400 dark:hover:text-blue-300"
             >
               Sign in
-            </a>
+            </Link>
           </p>
         </div>
       </div>

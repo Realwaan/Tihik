@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 import { TransactionsWorkspace } from "@/components/transactions-workspace";
 
+const noopSubscribe = () => () => {};
+
+function useIsClient() {
+  return useSyncExternalStore(noopSubscribe, () => true, () => false);
+}
+
 export function TransactionsWorkspaceShell() {
-  const [mounted, setMounted] = useState(false);
+  const isClient = useIsClient();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
+  if (!isClient) {
     return (
       <div className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
         <div className="h-6 w-44 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
