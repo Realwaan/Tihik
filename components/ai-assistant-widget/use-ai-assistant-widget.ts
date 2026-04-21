@@ -7,6 +7,34 @@ const AI_HISTORY_STORAGE_PREFIX = "trackit-ai-history-v1";
 const MAX_STORED_MESSAGES = 60;
 const MAX_STORED_CONTENT_LENGTH = 4000;
 
+type SpeechRecognitionAlternativeLike = {
+  transcript?: string;
+};
+
+type SpeechRecognitionResultLike = ArrayLike<SpeechRecognitionAlternativeLike>;
+
+type SpeechRecognitionEventLike = {
+  results: ArrayLike<SpeechRecognitionResultLike>;
+};
+
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionConstructorLike = new () => SpeechRecognitionLike;
+
+type BrowserWindowWithSpeechRecognition = Window & {
+  SpeechRecognition?: SpeechRecognitionConstructorLike;
+  webkitSpeechRecognition?: SpeechRecognitionConstructorLike;
+};
+
 function buildHistoryStorageKey(userId: string | null): string {
   return `${AI_HISTORY_STORAGE_PREFIX}:${userId?.trim() || "guest"}`;
 }
@@ -80,7 +108,7 @@ export function useAiAssistantWidget() {
   const [preferredCurrency, setPreferredCurrency] = useState<AssistantCurrency>("USD");
   const [historyStorageKey, setHistoryStorageKey] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const speechRecognitionRef = useRef<any>(null);
+  const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const historyHydratedRef = useRef(false);
 
   useEffect(() => {
@@ -156,8 +184,9 @@ export function useAiAssistantWidget() {
       return;
     }
 
+    const browserWindow = window as BrowserWindowWithSpeechRecognition;
     const SpeechRecognitionCtor =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
 
     if (!SpeechRecognitionCtor) {
       setDictationSupported(false);
@@ -169,9 +198,9 @@ export function useAiAssistantWidget() {
     recognition.interimResults = true;
     recognition.continuous = false;
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
       const transcript = Array.from(event.results)
-        .map((result: any) => result[0]?.transcript ?? "")
+        .map((result) => result[0]?.transcript ?? "")
         .join(" ")
         .trim();
 

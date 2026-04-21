@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Copy, Loader2, Trash2, WalletCards } from "lucide-react";
 import Skeleton from "@mui/material/Skeleton";
 
@@ -30,28 +30,21 @@ export function AccountOverviewHistory({
     () => Math.max(1, Math.ceil(filteredTransactions.length / TRANSACTIONS_PER_PAGE)),
     [filteredTransactions.length]
   );
+  const currentPageClamped = Math.min(currentPage, totalPages);
 
   const pagedTransactions = useMemo(() => {
-    const start = (currentPage - 1) * TRANSACTIONS_PER_PAGE;
+    const start = (currentPageClamped - 1) * TRANSACTIONS_PER_PAGE;
     return filteredTransactions.slice(start, start + TRANSACTIONS_PER_PAGE);
-  }, [filteredTransactions, currentPage]);
+  }, [filteredTransactions, currentPageClamped]);
 
   const pageStartIndex =
     filteredTransactions.length === 0
       ? 0
-      : (currentPage - 1) * TRANSACTIONS_PER_PAGE + 1;
+      : (currentPageClamped - 1) * TRANSACTIONS_PER_PAGE + 1;
   const pageEndIndex =
     filteredTransactions.length === 0
       ? 0
-      : Math.min(currentPage * TRANSACTIONS_PER_PAGE, filteredTransactions.length);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filteredTransactions.length]);
-
-  useEffect(() => {
-    setCurrentPage((previous) => Math.min(previous, totalPages));
-  }, [totalPages]);
+      : Math.min(currentPageClamped * TRANSACTIONS_PER_PAGE, filteredTransactions.length);
 
   return (
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/60">
@@ -139,21 +132,27 @@ export function AccountOverviewHistory({
               <div className="inline-flex items-center justify-center gap-2 self-center sm:justify-end">
                 <button
                   type="button"
-                  onClick={() => setCurrentPage((previous) => Math.max(1, previous - 1))}
-                  disabled={currentPage === 1}
+                  onClick={() =>
+                    setCurrentPage((previous) =>
+                      Math.max(1, Math.min(previous, totalPages) - 1)
+                    )
+                  }
+                  disabled={currentPageClamped === 1}
                   className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   Previous
                 </button>
                 <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Page {currentPage} of {totalPages}
+                  Page {currentPageClamped} of {totalPages}
                 </span>
                 <button
                   type="button"
                   onClick={() =>
-                    setCurrentPage((previous) => Math.min(totalPages, previous + 1))
+                    setCurrentPage((previous) =>
+                      Math.min(totalPages, Math.min(previous, totalPages) + 1)
+                    )
                   }
-                  disabled={currentPage === totalPages}
+                  disabled={currentPageClamped === totalPages}
                   className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   Next
