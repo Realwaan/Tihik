@@ -40,5 +40,5 @@ export function buildBrandfetchLogoProxySource(
   const normalizedDomain = normalizeLogoDomain(domain);
   if (!normalizedDomain) return null;
 
-  return `/api/brandfetch/logo?domain=${encodeURIComponent(normalizedDomain)}`;
+  return `/api/brandfetch/logo?domain=${encodeURIComponent(normalizedDomain)}&v=3`;
 }
