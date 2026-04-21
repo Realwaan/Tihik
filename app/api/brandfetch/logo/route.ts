@@ -110,9 +110,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const redirect = NextResponse.redirect(source, 307);
-    redirect.headers.set("Cache-Control", CACHE_CONTROL_VALUE);
-    return redirect;
+    const logoResponse = await fetch(source, {
+      headers: {
+        Accept: "image/*,*/*;q=0.8",
+      },
+    });
+
+    if (!logoResponse.ok || !logoResponse.body) {
+      return NextResponse.json(
+        { error: `Unable to load logo asset for ${domain}.` },
+        { status: 502 }
+      );
+    }
+
+    const headers = new Headers();
+    const contentType = logoResponse.headers.get("content-type");
+    if (contentType) {
+      headers.set("Content-Type", contentType);
+    }
+    headers.set("Cache-Control", CACHE_CONTROL_VALUE);
+
+    return new NextResponse(logoResponse.body, {
+      status: 200,
+      headers,
+    });
   } catch (error) {
     console.error("Brandfetch logo proxy failed:", error);
     return NextResponse.json(
