@@ -190,6 +190,33 @@ function normalizeCustomImageKey(value: string) {
   return value.trim().toLowerCase();
 }
 
+function loadStoredCustomImages(): Record<string, string> {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_CATEGORY_IMAGE_STORAGE_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") {
+      return {};
+    }
+
+    const sanitized: Record<string, string> = {};
+    for (const [key, image] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof key === "string" && typeof image === "string" && image.startsWith("data:image")) {
+        sanitized[key] = image;
+      }
+    }
+
+    return sanitized;
+  } catch {
+    return {};
+  }
+}
+
 export function CategoryCombobox({
   value,
   onChange,
@@ -197,7 +224,9 @@ export function CategoryCombobox({
   placeholder = "Select or type a category",
 }: CategoryComboboxProps) {
   const [open, setOpen] = useState(false);
-  const [customImages, setCustomImages] = useState<Record<string, string>>({});
+  const [customImages, setCustomImages] = useState<Record<string, string>>(() =>
+    loadStoredCustomImages()
+  );
   const [uploadTarget, setUploadTarget] = useState("");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -223,26 +252,6 @@ export function CategoryCombobox({
     [customImages, value]
   );
   const ActiveIcon = activeVisual.icon;
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(CUSTOM_CATEGORY_IMAGE_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as unknown;
-      if (!parsed || typeof parsed !== "object") return;
-
-      const sanitized: Record<string, string> = {};
-      for (const [key, image] of Object.entries(parsed as Record<string, unknown>)) {
-        if (typeof key === "string" && typeof image === "string" && image.startsWith("data:image")) {
-          sanitized[key] = image;
-        }
-      }
-
-      setCustomImages(sanitized);
-    } catch {
-      // ignore malformed localStorage values
-    }
-  }, []);
 
   useEffect(() => {
     try {
@@ -420,7 +429,7 @@ export function CategoryCombobox({
                   onClick={() => openUploadFor(value)}
                   className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
-                  Upload image for "{value.trim()}"
+                  Upload image for &quot;{value.trim()}&quot;
                 </button>
                 {customImages[normalizeCustomImageKey(value)] ? (
                   <button

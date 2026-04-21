@@ -10,7 +10,7 @@
     "web:dev": "npm run dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "transactions:backfill-accounts": "node scripts/backfill-transaction-accounts.mjs"

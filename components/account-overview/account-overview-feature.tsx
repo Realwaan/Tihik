@@ -94,6 +94,7 @@ export function AccountOverview() {
 
       {activeModalAccount ? (
         <AccountOverviewCardTransactionsModal
+          key={activeModalAccount.id}
           account={activeModalAccount}
           transactions={modalTransactions}
           preferredCurrency={preferredCurrency}

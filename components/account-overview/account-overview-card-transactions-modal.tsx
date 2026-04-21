@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Landmark, Smartphone, Wallet, X } from "lucide-react";
 
@@ -12,6 +12,11 @@ import { formatCurrency } from "./account-overview-utils";
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const UTC_MIDNIGHT_PATTERN = /^\d{4}-\d{2}-\d{2}T00:00:00(?:\.000)?Z$/;
 const TRANSACTIONS_PER_PAGE = 5;
+const noopSubscribe = () => () => {};
+
+function useIsClient() {
+  return useSyncExternalStore(noopSubscribe, () => true, () => false);
+}
 
 function formatTransactionTimestamp(transaction: Transaction) {
   const rawDate = transaction.date?.trim() ?? "";
@@ -61,7 +66,7 @@ export function AccountOverviewCardTransactionsModal({
   errorMessage = null,
   onClose,
 }: AccountOverviewCardTransactionsModalProps) {
-  const [mounted, setMounted] = useState(false);
+  const isClient = useIsClient();
   const [currentPage, setCurrentPage] = useState(1);
   const resolvedGroup = resolveAccountGroup(account);
   const groupLabel =
@@ -87,32 +92,21 @@ export function AccountOverviewCardTransactionsModal({
     () => Math.max(1, Math.ceil(sortedTransactions.length / TRANSACTIONS_PER_PAGE)),
     [sortedTransactions.length]
   );
+  const currentPageClamped = Math.min(currentPage, totalPages);
 
   const pagedTransactions = useMemo(() => {
-    const start = (currentPage - 1) * TRANSACTIONS_PER_PAGE;
+    const start = (currentPageClamped - 1) * TRANSACTIONS_PER_PAGE;
     return sortedTransactions.slice(start, start + TRANSACTIONS_PER_PAGE);
-  }, [sortedTransactions, currentPage]);
+  }, [sortedTransactions, currentPageClamped]);
 
   const pageStartIndex =
     sortedTransactions.length === 0
       ? 0
-      : (currentPage - 1) * TRANSACTIONS_PER_PAGE + 1;
+      : (currentPageClamped - 1) * TRANSACTIONS_PER_PAGE + 1;
   const pageEndIndex =
     sortedTransactions.length === 0
       ? 0
-      : Math.min(currentPage * TRANSACTIONS_PER_PAGE, sortedTransactions.length);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [account.id]);
-
-  useEffect(() => {
-    setCurrentPage((previous) => Math.min(previous, totalPages));
-  }, [totalPages]);
+      : Math.min(currentPageClamped * TRANSACTIONS_PER_PAGE, sortedTransactions.length);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -141,7 +135,7 @@ export function AccountOverviewCardTransactionsModal({
     };
   }, []);
 
-  if (!mounted) {
+  if (!isClient) {
     return null;
   }
 
@@ -279,21 +273,27 @@ export function AccountOverviewCardTransactionsModal({
                 <div className="inline-flex items-center justify-center gap-2 self-center sm:justify-end">
                   <button
                     type="button"
-                    onClick={() => setCurrentPage((previous) => Math.max(1, previous - 1))}
-                    disabled={currentPage === 1}
+                    onClick={() =>
+                      setCurrentPage((previous) =>
+                        Math.max(1, Math.min(previous, totalPages) - 1)
+                      )
+                    }
+                    disabled={currentPageClamped === 1}
                     className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     Previous
                   </button>
                   <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                    Page {currentPage} of {totalPages}
+                    Page {currentPageClamped} of {totalPages}
                   </span>
                   <button
                     type="button"
                     onClick={() =>
-                      setCurrentPage((previous) => Math.min(totalPages, previous + 1))
+                      setCurrentPage((previous) =>
+                        Math.min(totalPages, Math.min(previous, totalPages) + 1)
+                      )
                     }
-                    disabled={currentPage === totalPages}
+                    disabled={currentPageClamped === totalPages}
                     className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     Next

@@ -5,7 +5,6 @@ import { auth } from "@/auth";
 import { requestSchema, SYSTEM_INSTRUCTION } from "./config";
 import { buildLocalFallbackReply } from "./fallback";
 import { callGemini, callNvidiaNemotron, callOpenAI } from "./providers";
-import { buildOutOfScopeReply, isAssistantRequestInScope } from "./scope";
 import { buildUserFinanceSnapshot } from "./snapshot";
 import { tryExecuteTransactionCommand } from "./transaction-actions";
 
@@ -27,23 +26,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    const inScope = isAssistantRequestInScope({
-      message: parsed.data.message,
-      history: parsed.data.history ?? [],
-    });
-
-    if (!inScope) {
-      return NextResponse.json(
-        {
-          data: {
-            reply: buildOutOfScopeReply(),
-          },
-        },
-        { status: 200 }
-      );
-    }
-
 
     const session = await auth();
     const userName = session?.user?.name?.trim() || "there";

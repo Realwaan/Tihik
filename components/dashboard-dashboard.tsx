@@ -1537,6 +1537,7 @@ export function DashboardDashboard() {
 
       {selectedAccountCard ? (
         <AccountOverviewCardTransactionsModal
+          key={selectedAccountCard.id}
           account={{
             id: selectedAccountCard.id,
             account: selectedAccountCard.category,

@@ -1,3 +1,5 @@
+import { extractDomainFromLogoUrl } from "@/lib/brandfetch-logo";
+
 export type WalletBadge = {
   code: string;
   kind: "wallet" | "bank";
@@ -6,6 +8,7 @@ export type WalletBadge = {
   iconToneClass: string;
   logoText: string;
   logoGradientClass: string;
+  officialLogoDomain?: string;
   officialLogoPath?: string;
   officialLogoUrl?: string;
 };
@@ -15,6 +18,7 @@ type WalletBadgeSeed = Omit<WalletBadge, "logoText" | "logoGradientClass">;
 type LogoOverride = {
   logoText: string;
   logoGradientClass: string;
+  officialLogoDomain?: string;
   officialLogoPath?: string;
   officialLogoUrl?: string;
 };
@@ -613,12 +617,17 @@ export function getWalletBadge(category: string): WalletBadge | null {
   if (!matched) return null;
 
   const logoOverride = LOGO_OVERRIDES_BY_CODE[matched.badge.code.toUpperCase()];
+  const officialLogoDomain =
+    logoOverride?.officialLogoDomain ??
+    extractDomainFromLogoUrl(logoOverride?.officialLogoUrl) ??
+    undefined;
 
   return {
     ...matched.badge,
     logoText: logoOverride?.logoText ?? normalizeLogoText(matched.badge.code),
     logoGradientClass:
       logoOverride?.logoGradientClass ?? pickGradient(normalized, matched.badge.kind),
+    officialLogoDomain,
     officialLogoPath: logoOverride?.officialLogoPath,
     officialLogoUrl: logoOverride?.officialLogoUrl,
   };

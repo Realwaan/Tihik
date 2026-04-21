@@ -31,12 +31,10 @@ function isActivePath(pathname: string, href: string) {
 
 export function MobileNavDock() {
   const pathname = usePathname();
-  const [isMounted, setIsMounted] = useState(false);
   const [dockReady, setDockReady] = useState(false);
   const dockRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    setIsMounted(true);
     const frame = window.requestAnimationFrame(() => setDockReady(true));
     return () => {
       window.cancelAnimationFrame(frame);
@@ -44,10 +42,6 @@ export function MobileNavDock() {
   }, []);
 
   useEffect(() => {
-    if (!isMounted) {
-      return;
-    }
-
     function updateDockClearance() {
       if (!dockRef.current) return;
 
@@ -80,11 +74,7 @@ export function MobileNavDock() {
       window.removeEventListener("resize", updateDockClearance);
       window.removeEventListener("orientationchange", updateDockClearance);
     };
-  }, [isMounted, pathname]);
-
-  if (!isMounted) {
-    return null;
-  }
+  }, [pathname]);
 
   return (
     <nav ref={dockRef} className="fixed inset-x-0 bottom-2 z-40 px-3 lg:bottom-2">
