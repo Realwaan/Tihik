@@ -22,11 +22,11 @@ const BRAND_FETCH_API_BASE_URL = "https://api.brandfetch.io/v2/brands";
 const CACHE_CONTROL_VALUE = "public, s-maxage=86400, stale-while-revalidate=604800";
 
 const FORMAT_PRIORITY: Record<string, number> = {
-  svg: 5,
-  webp: 4,
-  png: 3,
-  jpg: 2,
-  jpeg: 2,
+  webp: 5,
+  png: 4,
+  jpg: 3,
+  jpeg: 3,
+  svg: 1,
 };
 
 function getBrandfetchApiKey() {
@@ -40,10 +40,32 @@ function getBrandfetchApiKey() {
 function pickBestLogoSource(payload: BrandfetchResponse): string | null {
   let bestSource: string | null = null;
   let bestScore = -1;
+  const hasLightLogo = (payload.logos ?? []).some((logo) => {
+    const normalizedType = logo.type?.toLowerCase() ?? "";
+    const normalizedTheme = logo.theme?.toLowerCase() ?? "";
+    return normalizedType === "logo" && normalizedTheme === "light";
+  });
 
   for (const logo of payload.logos ?? []) {
-    const typeScore = logo.type === "logo" ? 50 : logo.type === "icon" ? 20 : 0;
-    const themeScore = logo.theme === "dark" ? 2 : logo.theme === "light" ? 1 : 0;
+    const normalizedType = logo.type?.toLowerCase() ?? "";
+    const normalizedTheme = logo.theme?.toLowerCase() ?? "";
+    const typeScore = hasLightLogo
+      ? normalizedType === "logo"
+        ? 80
+        : normalizedType === "symbol"
+          ? 55
+          : normalizedType === "icon"
+            ? 10
+            : 20
+      : normalizedType === "icon"
+        ? 80
+        : normalizedType === "symbol"
+          ? 70
+          : normalizedType === "logo"
+            ? 45
+            : 20;
+    const themeScore =
+      normalizedTheme === "light" ? 18 : normalizedTheme === "dark" ? 2 : 10;
 
     for (const format of logo.formats ?? []) {
       const source = format.src?.trim();
