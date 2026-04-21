@@ -1,13 +1,49 @@
 import { z } from "zod";
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseDateInput(value: unknown) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  if (!DATE_ONLY_PATTERN.test(trimmed)) {
+    return value;
+  }
+
+  const [yearText, monthText, dayText] = trimmed.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return value;
+  }
+
+  const now = new Date();
+  return new Date(
+    year,
+    month - 1,
+    day,
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+    now.getMilliseconds()
+  );
+}
+
 const amountSchema = z.coerce
   .number({ invalid_type_error: "Amount must be a number" })
   .finite("Amount must be a valid number")
   .min(0, "Amount cannot be negative");
 
-const dateSchema = z.coerce.date({
-  invalid_type_error: "Date must be a valid date",
-});
+const dateSchema = z.preprocess(
+  parseDateInput,
+  z.coerce.date({
+    invalid_type_error: "Date must be a valid date",
+  })
+);
 
 const transactionBaseSchema = z.object({
   amount: amountSchema,

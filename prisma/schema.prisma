@@ -45,6 +45,10 @@ enum Currency {
   PHP
 }
 
+enum BankIntegrationProvider {
+  GENERIC
+}
+
 model User {
   id                  String                @id @default(cuid())
   name                String?
@@ -64,6 +68,8 @@ model User {
   householdMemberships HouseholdMember[]
   paidSharedExpenses  SharedExpense[]       @relation("SharedExpensePayer")
   notificationPreference NotificationPreference?
+  bankConnections     BankConnection[]
+  importedBankTransactions ImportedBankTransaction[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 }
@@ -136,6 +142,7 @@ model Transaction {
   sourceRecurring     RecurringTransaction? @relation(fields: [sourceRecurringId], references: [id], onDelete: SetNull)
   sourceInstallment   InstallmentPlan?    @relation(fields: [sourceInstallmentId], references: [id], onDelete: SetNull)
   installmentPayment  InstallmentPayment? @relation("InstallmentPaymentTransaction")
+  importedBankRecords ImportedBankTransaction[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
@@ -147,6 +154,49 @@ model Transaction {
   @@index([sourceRecurringId])
   @@index([sourceInstallmentId])
   @@unique([sourceRecurringId, recurrenceOccurrence])
+}
+
+model BankConnection {
+  id                 String                  @id @default(cuid())
+  userId             String
+  provider           BankIntegrationProvider
+  providerAccountId  String                  @default("")
+  accountLabel       String?
+  encryptedAccessToken String               @db.Text
+  encryptedRefreshToken String?             @db.Text
+  tokenScope         String?
+  tokenExpiresAt     DateTime?
+  lastCursor         String?
+  lastSyncedAt       DateTime?
+  user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  imports            ImportedBankTransaction[]
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@index([userId, provider])
+  @@unique([userId, provider, providerAccountId])
+}
+
+model ImportedBankTransaction {
+  id                    String            @id @default(cuid())
+  userId                String
+  connectionId          String
+  externalTransactionId String
+  transactionId         String?           @unique
+  amount                Float
+  currency              Currency          @default(USD)
+  occurredAt            DateTime
+  description           String
+  externalRaw           String?           @db.Text
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection            BankConnection    @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  transaction           Transaction?      @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@unique([connectionId, externalTransactionId])
+  @@index([userId, occurredAt])
+  @@index([connectionId, occurredAt])
 }
 
 model InstallmentPlan {

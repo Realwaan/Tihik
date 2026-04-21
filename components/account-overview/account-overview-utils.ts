@@ -44,3 +44,19 @@ export function formatCurrency(value: number, currency: Currency) {
     maximumFractionDigits: currency === "JPY" ? 0 : 2,
   }).format(value);
 }
+
+export function isTransactionLinkedToAccount(
+  transaction: Transaction,
+  accountName: string
+) {
+  const normalized = accountName.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  const source = transaction.sourceAccount?.trim().toLowerCase() ?? "";
+  const destination = transaction.destinationAccount?.trim().toLowerCase() ?? "";
+  const category = transaction.category.trim().toLowerCase();
+
+  return source === normalized || destination === normalized || category === normalized;
+}
