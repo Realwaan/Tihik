@@ -13,7 +13,9 @@
     "lint": "eslint .",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "transactions:backfill-accounts": "node scripts/backfill-transaction-accounts.mjs"
+    "transactions:backfill-accounts": "node scripts/backfill-transaction-accounts.mjs",
+    "roadmap:sidequest": "node scripts/sidequest-roadmap.mjs SideQuest",
+    "roadmap": "npm run roadmap:sidequest"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",
