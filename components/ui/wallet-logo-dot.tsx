@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { buildBrandfetchLogoProxySource } from "@/lib/brandfetch-logo";
 import type { WalletBadge } from "@/lib/wallet-badges";
@@ -39,10 +39,26 @@ export function WalletLogoDot({
   className = "",
   sizeClass = "h-5 w-5",
   textClass = "text-[9px]",
-  imageClassName = "absolute inset-[1px] h-[calc(100%-2px)] w-[calc(100%-2px)] rounded-full bg-white/95 object-contain p-[1px] ring-1 ring-black/10 shadow-[0_1px_2px_rgba(0,0,0,0.2)]",
+  imageClassName = "absolute inset-[1px] h-[calc(100%-2px)] w-[calc(100%-2px)] rounded-full object-contain",
 }: WalletLogoDotProps) {
   const sources = useMemo(() => buildLogoSources(badge), [badge]);
-  const source = sources[0];
+  const [sourceIndex, setSourceIndex] = useState(() => (sources.length > 0 ? 0 : -1));
+  const source = sourceIndex >= 0 ? sources[sourceIndex] : null;
+
+  useEffect(() => {
+    setSourceIndex(sources.length > 0 ? 0 : -1);
+  }, [sources]);
+
+  const advanceSource = () => {
+    setSourceIndex((currentIndex) => {
+      if (currentIndex < 0) {
+        return -1;
+      }
+
+      const nextIndex = currentIndex + 1;
+      return nextIndex < sources.length ? nextIndex : -1;
+    });
+  };
 
   return (
     <span
@@ -59,18 +75,12 @@ export function WalletLogoDot({
           referrerPolicy="no-referrer"
           data-source-index="0"
           className={imageClassName}
-          onError={(event) => {
+          onError={advanceSource}
+          onLoad={(event) => {
             const image = event.currentTarget;
-            const currentIndex = Number(image.dataset.sourceIndex ?? "0");
-            const nextIndex = currentIndex + 1;
-
-            if (nextIndex >= sources.length) {
-              image.style.display = "none";
-              return;
+            if (image.naturalWidth === 0 || image.naturalHeight === 0) {
+              advanceSource();
             }
-
-            image.dataset.sourceIndex = String(nextIndex);
-            image.src = sources[nextIndex] ?? "";
           }}
         />
       ) : null}

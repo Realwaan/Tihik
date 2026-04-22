@@ -22,11 +22,11 @@ const BRAND_FETCH_API_BASE_URL = "https://api.brandfetch.io/v2/brands";
 const CACHE_CONTROL_VALUE = "public, s-maxage=86400, stale-while-revalidate=604800";
 
 const FORMAT_PRIORITY: Record<string, number> = {
+  svg: 6,
   webp: 5,
   png: 4,
   jpg: 3,
   jpeg: 3,
-  svg: 1,
 };
 
 function getBrandfetchApiKey() {

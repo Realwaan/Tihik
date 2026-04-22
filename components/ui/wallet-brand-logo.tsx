@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CreditCard } from "lucide-react";
 
 import { buildBrandfetchLogoProxySource } from "@/lib/brandfetch-logo";
@@ -65,21 +65,36 @@ export function WalletBrandLogo({
   className = "",
 }: WalletBrandLogoProps) {
   const sources = useMemo(() => buildLogoSources(badge, label), [badge, label]);
-  const source = sources[0];
+  const [sourceIndex, setSourceIndex] = useState(() => (sources.length > 0 ? 0 : -1));
+  const source = sourceIndex >= 0 ? sources[sourceIndex] : null;
   const gradientClass = badge?.logoGradientClass ?? "from-slate-400 to-slate-600";
+  const normalizedLabelText = label
+    .trim()
+    .replace(/[^a-z0-9]/gi, "")
+    .slice(0, 2)
+    .toUpperCase();
+  const fallbackText =
+    badge?.logoText ?? (normalizedLabelText || "WL");
+
+  useEffect(() => {
+    setSourceIndex(sources.length > 0 ? 0 : -1);
+  }, [sources]);
+
+  const advanceSource = () => {
+    setSourceIndex((currentIndex) => {
+      if (currentIndex < 0) {
+        return -1;
+      }
+
+      const nextIndex = currentIndex + 1;
+      return nextIndex < sources.length ? nextIndex : -1;
+    });
+  };
 
   return (
     <span
-      className={`relative inline-flex h-9 min-w-[3.35rem] items-center justify-center overflow-hidden rounded-xl border border-white/40 bg-white/80 px-2.5 shadow-[0_8px_20px_rgba(15,23,42,0.22)] backdrop-blur-md dark:border-white/15 dark:bg-slate-950/70 ${className}`.trim()}
+      className={`relative inline-flex h-9 min-w-[3.35rem] items-center justify-center overflow-hidden rounded-xl px-2.5 ${source ? "border border-transparent bg-transparent shadow-none" : `border border-white/30 bg-gradient-to-br ${gradientClass} text-white shadow-[0_8px_20px_rgba(15,23,42,0.22)]`} ${className}`.trim()}
     >
-      <span
-        aria-hidden
-        className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${gradientClass} opacity-25`}
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-[1px] rounded-[10px] bg-white/90 dark:bg-slate-950/78"
-      />
       {source ? (
         <img
           key={source}
@@ -89,23 +104,21 @@ export function WalletBrandLogo({
           decoding="async"
           referrerPolicy="no-referrer"
           data-source-index="0"
-          className="relative z-10 h-5 w-auto max-w-[4.75rem] object-contain drop-shadow-[0_1px_1px_rgba(0,0,0,0.28)]"
-          onError={(event) => {
+          className="relative z-10 h-6 w-auto max-w-[4.75rem] object-contain"
+          onError={advanceSource}
+          onLoad={(event) => {
             const image = event.currentTarget;
-            const currentIndex = Number(image.dataset.sourceIndex ?? "0");
-            const nextIndex = currentIndex + 1;
-
-            if (nextIndex >= sources.length) {
-              image.style.display = "none";
-              return;
+            // Some placeholder files resolve to an image element with zero dimensions.
+            if (image.naturalWidth === 0 || image.naturalHeight === 0) {
+              advanceSource();
             }
-
-            image.dataset.sourceIndex = String(nextIndex);
-            image.src = sources[nextIndex] ?? "";
           }}
         />
       ) : (
-        <CreditCard className="relative z-10 h-4 w-4 text-slate-700 dark:text-slate-100" />
+        <span className="relative z-10 inline-flex items-center gap-1">
+          <span className="text-[11px] font-semibold tracking-[0.08em]">{fallbackText}</span>
+          <CreditCard className="h-3.5 w-3.5 opacity-90" />
+        </span>
       )}
     </span>
   );

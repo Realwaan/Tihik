@@ -20,8 +20,8 @@ import MuiSkeleton from "@mui/material/Skeleton";
 
 import { AccountOverviewCardTransactionsModal } from "@/components/account-overview/account-overview-card-transactions-modal";
 import { isTransactionLinkedToAccount } from "@/components/account-overview/account-overview-utils";
-import { SignOutButton } from "@/components/auth-buttons";
 import { MobileNavDock } from "@/components/mobile-nav-dock";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { WalletBrandLogo } from "@/components/ui/wallet-brand-logo";
@@ -29,6 +29,7 @@ import { WalletCategoryBadge } from "@/components/ui/wallet-category-badge";
 import { getAccountCardTheme } from "@/lib/account-card-theme";
 import { isCreditCardLikeAccount } from "@/lib/bank-account-eligibility";
 import { getWalletBadge } from "@/lib/wallet-badges";
+import { UserButton } from "@clerk/nextjs";
 
 type DashboardData = {
   totalIncome: number;
@@ -653,7 +654,7 @@ export function DashboardDashboard() {
 
   return (
     <main className="page-shell dock-safe app-surface min-h-screen">
-      <div className="reveal relative z-40 overflow-visible border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+      <div className="reveal relative z-40 overflow-visible border-b border-slate-200/70 bg-white/82 backdrop-blur dark:border-slate-800/70 dark:bg-slate-900/75">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-10">
           <div>
             <p className="text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-amber-600 dark:text-amber-400 sm:text-xs">TrackIt</p>
@@ -661,31 +662,31 @@ export function DashboardDashboard() {
           </div>
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-3">
             <a href="/transactions" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full justify-center sm:w-auto">
+              <Button variant="outline" className="w-full justify-center border-slate-300/70 bg-white/70 text-slate-700 shadow-none hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 sm:w-auto">
                 <RefreshCcw className="h-4 w-4" />
                 Transactions
               </Button>
             </a>
             <a href="/budgets" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full justify-center sm:w-auto">
+              <Button variant="outline" className="w-full justify-center border-slate-300/70 bg-white/70 text-slate-700 shadow-none hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 sm:w-auto">
                 <Target className="h-4 w-4" />
                 Budgets
               </Button>
             </a>
             <a href="/plan" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full justify-center sm:w-auto">
+              <Button variant="outline" className="w-full justify-center border-slate-300/70 bg-white/70 text-slate-700 shadow-none hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 sm:w-auto">
                 <CreditCard className="h-4 w-4" />
                 Plan
               </Button>
             </a>
             <a href="/collaboration" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full justify-center sm:w-auto">
+              <Button variant="outline" className="w-full justify-center border-slate-300/70 bg-white/70 text-slate-700 shadow-none hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 sm:w-auto">
                 <Users className="h-4 w-4" />
                 Collaboration
               </Button>
             </a>
             <a href="/profile" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full justify-center sm:w-auto">
+              <Button variant="outline" className="w-full justify-center border-slate-300/70 bg-white/70 text-slate-700 shadow-none hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 sm:w-auto">
                 <User className="h-4 w-4" />
                 Settings
               </Button>
@@ -694,7 +695,7 @@ export function DashboardDashboard() {
               <button
                 type="button"
                 onClick={toggleNotifications}
-                className="relative inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:bg-slate-50 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 motion-reduce:transition-none sm:w-auto"
+                className="relative inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-300/70 bg-white/70 px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 motion-reduce:transition-none sm:w-auto"
               >
                 <Bell className="h-4 w-4" />
                 Notifications
@@ -861,7 +862,17 @@ export function DashboardDashboard() {
                 </>
               ) : null}
             </div>
-            <SignOutButton />
+            <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1 sm:w-auto sm:justify-start sm:gap-3">
+              <ThemeToggle />
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox:
+                      "h-10 w-10 ring-1 ring-slate-300/80 dark:ring-slate-700/80 shadow-sm",
+                  },
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
