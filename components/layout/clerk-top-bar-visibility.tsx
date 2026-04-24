@@ -14,8 +14,7 @@ export function ClerkTopBarVisibility({ children }: ClerkTopBarVisibilityProps) 
     return <>{children}</>;
   }
 
-  const showOnPath =
-    pathname === "/" || pathname.startsWith("/signin") || pathname.startsWith("/signup");
+  const showOnPath = pathname.startsWith("/signin") || pathname.startsWith("/signup");
 
   if (!showOnPath) {
     return null;
