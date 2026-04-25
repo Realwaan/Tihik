@@ -49,6 +49,7 @@ function getLastNMonthRanges(count: number) {
 
 export async function getNotificationsForUser(userId: string) {
   const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
@@ -121,7 +122,7 @@ export async function getNotificationsForUser(userId: string) {
         },
         _sum: { amount: true },
       }),
-      prisma.notificationPreference.findUnique({ where: { userId } }),
+      prisma.notificationPreference.findUnique({ where: { userId } }).catch(() => null),
       prisma.$queryRaw<
         Array<{
           id: string;
@@ -196,7 +197,7 @@ export async function getNotificationsForUser(userId: string) {
     const usagePercent = budget.limit > 0 ? (spent / budget.limit) * 100 : 0;
     if (usagePercent >= 100 && effectivePreferences.budgetOverEnabled) {
       notifications.push({
-        id: `budget-over-${budget.id}`,
+        id: `budget-over-${budget.id}-${monthKey}`,
         type: "BUDGET_OVER",
         severity: "warning",
         title: `Over budget: ${budget.category}`,
@@ -205,7 +206,7 @@ export async function getNotificationsForUser(userId: string) {
       });
     } else if (usagePercent >= 80 && effectivePreferences.budgetNearEnabled) {
       notifications.push({
-        id: `budget-near-${budget.id}`,
+        id: `budget-near-${budget.id}-${monthKey}`,
         type: "BUDGET_NEAR",
         severity: "info",
         title: `Near budget limit: ${budget.category}`,
@@ -227,7 +228,7 @@ export async function getNotificationsForUser(userId: string) {
     const increase =
       ((currentTrend.expense - previousTrend.expense) / previousTrend.expense) * 100;
     notifications.push({
-      id: "smart-spike-month",
+      id: `smart-spike-month-${monthKey}`,
       type: "SMART_SPIKE_MONTH",
       severity: "warning",
       title: "Monthly spending spike",
@@ -245,7 +246,7 @@ export async function getNotificationsForUser(userId: string) {
     topCategory.amount > secondCategory.amount * 1.8
   ) {
     notifications.push({
-      id: "smart-category-surge",
+      id: `smart-category-surge-${monthKey}`,
       type: "SMART_CATEGORY_SURGE",
       severity: "info",
       title: "Category concentration alert",
@@ -258,7 +259,7 @@ export async function getNotificationsForUser(userId: string) {
     const largeExpenseUsd = convertToUSD(largeExpense.amount, largeExpense.currency);
     if (largeExpenseUsd >= totalExpensesUsd * 0.35) {
       notifications.push({
-        id: "smart-large-expense",
+        id: `smart-large-expense-${monthKey}`,
         type: "SMART_LARGE_EXPENSE",
         severity: "warning",
         title: "Large expense detected",
@@ -271,13 +272,14 @@ export async function getNotificationsForUser(userId: string) {
   const reminderCutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   for (const payment of settlementReminders) {
     const dueDate = new Date(payment.dueDate);
+    const dueDateKey = dueDate.toISOString().slice(0, 10);
     const daysUntilDue = Math.ceil(
       (dueDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)
     );
 
     if (daysUntilDue < 0) {
       notifications.push({
-        id: `settlement-overdue-${payment.id}`,
+        id: `settlement-overdue-${payment.id}-${dueDateKey}`,
         type: "COLLAB_SETTLEMENT_OVERDUE",
         severity: "warning",
         title: `Settlement overdue in ${payment.householdName}`,
@@ -291,7 +293,7 @@ export async function getNotificationsForUser(userId: string) {
       const reminderSentRecently =
         payment.lastReminderAt && new Date(payment.lastReminderAt) > reminderCutoff;
       notifications.push({
-        id: `settlement-reminder-${payment.id}`,
+        id: `settlement-reminder-${payment.id}-${dueDateKey}`,
         type: "COLLAB_SETTLEMENT_REMINDER",
         severity: reminderSentRecently ? "warning" : "info",
         title: `Settlement due soon in ${payment.householdName}`,
@@ -305,6 +307,7 @@ export async function getNotificationsForUser(userId: string) {
   }
 
   for (const recurring of missedRecurring) {
+    const recurringRunDateKey = new Date(recurring.nextRunDate).toISOString().slice(0, 10);
     const daysLate = Math.max(
       1,
       Math.floor(
@@ -314,7 +317,7 @@ export async function getNotificationsForUser(userId: string) {
     );
 
     notifications.push({
-      id: `recurring-missed-${recurring.id}`,
+      id: `recurring-missed-${recurring.id}-${recurringRunDateKey}`,
       type: "RECURRING_MISSED_PAYMENT",
       severity: "warning",
       title: `Missed recurring entry: ${recurring.category}`,
