@@ -13,6 +13,15 @@ const TRANSACTION_TYPE = {
 
 const TRANSFER_CATEGORY = "Transfer";
 
+async function safeQuery<T>(label: string, query: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await query;
+  } catch (error) {
+    console.error(`Dashboard query failed: ${label}`, error);
+    return fallback;
+  }
+}
+
 export async function GET() {
   try {
     const session = await auth();
@@ -26,89 +35,113 @@ export async function GET() {
     const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     const [incomeAgg, expenseAgg, expenseRows, budgets] = await Promise.all([
-      prisma.transaction.aggregate({
-        where: {
-          userId: session.user.id,
-          type: TRANSACTION_TYPE.INCOME,
-          date: {
-            gte: monthStart,
-            lt: nextMonthStart,
+      safeQuery(
+        "income aggregate",
+        prisma.transaction.aggregate({
+          where: {
+            userId: session.user.id,
+            type: TRANSACTION_TYPE.INCOME,
+            date: {
+              gte: monthStart,
+              lt: nextMonthStart,
+            },
           },
-        },
-        _sum: {
-          amount: true,
-        },
-      }),
-      prisma.transaction.aggregate({
-        where: {
-          userId: session.user.id,
-          type: TRANSACTION_TYPE.EXPENSE,
-          category: {
-            not: TRANSFER_CATEGORY,
+          _sum: {
+            amount: true,
           },
-          date: {
-            gte: monthStart,
-            lt: nextMonthStart,
+        }),
+        { _sum: { amount: 0 } }
+      ),
+      safeQuery(
+        "expense aggregate",
+        prisma.transaction.aggregate({
+          where: {
+            userId: session.user.id,
+            type: TRANSACTION_TYPE.EXPENSE,
+            category: {
+              not: TRANSFER_CATEGORY,
+            },
+            date: {
+              gte: monthStart,
+              lt: nextMonthStart,
+            },
           },
-        },
-        _sum: {
-          amount: true,
-        },
-      }),
-      prisma.transaction.groupBy({
-        by: ["category"],
-        where: {
-          userId: session.user.id,
-          type: TRANSACTION_TYPE.EXPENSE,
-          category: {
-            not: TRANSFER_CATEGORY,
+          _sum: {
+            amount: true,
           },
-          date: {
-            gte: monthStart,
-            lt: nextMonthStart,
+        }),
+        { _sum: { amount: 0 } }
+      ),
+      safeQuery(
+        "expense by category",
+        prisma.transaction.groupBy({
+          by: ["category"],
+          where: {
+            userId: session.user.id,
+            type: TRANSACTION_TYPE.EXPENSE,
+            category: {
+              not: TRANSFER_CATEGORY,
+            },
+            date: {
+              gte: monthStart,
+              lt: nextMonthStart,
+            },
           },
-        },
-        _sum: {
-          amount: true,
-        },
-      }),
-      prisma.budget.findMany({
-        where: {
-          userId: session.user.id,
-          month: monthStart,
-        },
-      }),
+          _sum: {
+            amount: true,
+          },
+        }),
+        []
+      ),
+      safeQuery(
+        "monthly budgets",
+        prisma.budget.findMany({
+          where: {
+            userId: session.user.id,
+            month: monthStart,
+          },
+        }),
+        []
+      ),
     ]);
 
-    const walletRows = await prisma.transaction.findMany({
-      where: {
-        userId: session.user.id,
-      },
-      select: {
-        amount: true,
-        type: true,
-        category: true,
-        sourceAccount: true,
-        destinationAccount: true,
-      },
-    });
+    const walletRows = await safeQuery(
+      "wallet rows",
+      prisma.transaction.findMany({
+        where: {
+          userId: session.user.id,
+        },
+        select: {
+          amount: true,
+          type: true,
+          category: true,
+          sourceAccount: true,
+          destinationAccount: true,
+        },
+      }),
+      []
+    );
 
     const totalIncome = incomeAgg._sum.amount ?? 0;
     const totalExpenses = expenseAgg._sum.amount ?? 0;
     const currentBalance = totalIncome - totalExpenses;
-    const totalsByCurrency = await prisma.transaction.groupBy({
-      by: ["currency", "type"],
-      where: {
-        userId: session.user.id,
-        date: {
-          gte: monthStart,
-          lt: nextMonthStart,
+    const totalsByCurrency = await safeQuery(
+      "totals by currency",
+      prisma.transaction.groupBy({
+        by: ["currency", "type"],
+        where: {
+          userId: session.user.id,
+          date: {
+            gte: monthStart,
+            lt: nextMonthStart,
+          },
         },
-      },
-      _sum: {
-        amount: true,
-      },
-    });
+        _sum: {
+          amount: true,
+        },
+      }),
+      []
+    );
 
     const totalsByCurrencySummary = totalsByCurrency.map((row) => ({
       currency: row.currency,
@@ -222,31 +255,39 @@ export async function GET() {
     const monthlyTrend = await Promise.all(
       trendMonths.map(async (range) => {
         const [income, expense] = await Promise.all([
-          prisma.transaction.aggregate({
-            where: {
-              userId: session.user.id,
-              type: TRANSACTION_TYPE.INCOME,
-              date: {
-                gte: range.start,
-                lt: range.end,
+          safeQuery(
+            `trend income ${range.key}`,
+            prisma.transaction.aggregate({
+              where: {
+                userId: session.user.id,
+                type: TRANSACTION_TYPE.INCOME,
+                date: {
+                  gte: range.start,
+                  lt: range.end,
+                },
               },
-            },
-            _sum: { amount: true },
-          }),
-          prisma.transaction.aggregate({
-            where: {
-              userId: session.user.id,
-              type: TRANSACTION_TYPE.EXPENSE,
-              category: {
-                not: TRANSFER_CATEGORY,
+              _sum: { amount: true },
+            }),
+            { _sum: { amount: 0 } }
+          ),
+          safeQuery(
+            `trend expense ${range.key}`,
+            prisma.transaction.aggregate({
+              where: {
+                userId: session.user.id,
+                type: TRANSACTION_TYPE.EXPENSE,
+                category: {
+                  not: TRANSFER_CATEGORY,
+                },
+                date: {
+                  gte: range.start,
+                  lt: range.end,
+                },
               },
-              date: {
-                gte: range.start,
-                lt: range.end,
-              },
-            },
-            _sum: { amount: true },
-          }),
+              _sum: { amount: true },
+            }),
+            { _sum: { amount: 0 } }
+          ),
         ]);
 
         const incomeValue = income._sum.amount ?? 0;
@@ -282,30 +323,38 @@ export async function GET() {
       Math.max(1, monthlyTrend.length);
 
     const [recurringIncomeTemplates, recurringExpenseTemplates] = await Promise.all([
-      prisma.recurringTransaction.findMany({
-        where: {
-          userId: session.user.id,
-          isActive: true,
-          type: TRANSACTION_TYPE.INCOME,
-        },
-        select: {
-          amount: true,
-          frequency: true,
-          interval: true,
-        },
-      }),
-      prisma.recurringTransaction.findMany({
-        where: {
-          userId: session.user.id,
-          isActive: true,
-          type: TRANSACTION_TYPE.EXPENSE,
-        },
-        select: {
-          amount: true,
-          frequency: true,
-          interval: true,
-        },
-      }),
+      safeQuery(
+        "recurring income templates",
+        prisma.recurringTransaction.findMany({
+          where: {
+            userId: session.user.id,
+            isActive: true,
+            type: TRANSACTION_TYPE.INCOME,
+          },
+          select: {
+            amount: true,
+            frequency: true,
+            interval: true,
+          },
+        }),
+        []
+      ),
+      safeQuery(
+        "recurring expense templates",
+        prisma.recurringTransaction.findMany({
+          where: {
+            userId: session.user.id,
+            isActive: true,
+            type: TRANSACTION_TYPE.EXPENSE,
+          },
+          select: {
+            amount: true,
+            frequency: true,
+            interval: true,
+          },
+        }),
+        []
+      ),
     ]);
 
     const expectedRecurringIncome = recurringIncomeTemplates.reduce(
@@ -350,23 +399,27 @@ export async function GET() {
     const topCategories = expensesByCategory.slice(0, 5).map((item) => item.category);
     const categoryDrilldown = await Promise.all(
       trendMonths.map(async (range) => {
-        const rows = await prisma.transaction.groupBy({
-          by: ["category"],
-          where: {
-            userId: session.user.id,
-            type: TRANSACTION_TYPE.EXPENSE,
-            date: {
-              gte: range.start,
-              lt: range.end,
+        const rows = await safeQuery(
+          `category drilldown ${range.key}`,
+          prisma.transaction.groupBy({
+            by: ["category"],
+            where: {
+              userId: session.user.id,
+              type: TRANSACTION_TYPE.EXPENSE,
+              date: {
+                gte: range.start,
+                lt: range.end,
+              },
+              category: {
+                in: topCategories,
+              },
             },
-            category: {
-              in: topCategories,
+            _sum: {
+              amount: true,
             },
-          },
-          _sum: {
-            amount: true,
-          },
-        });
+          }),
+          []
+        );
 
         const valueMap = new Map(rows.map((row) => [row.category, row._sum.amount ?? 0]));
         return {

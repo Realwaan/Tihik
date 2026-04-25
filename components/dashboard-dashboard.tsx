@@ -2,7 +2,7 @@
 
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, PieChart, RefreshCcw, Wallet, Target, Users, User, Bell, Landmark, Smartphone, CreditCard, MoreHorizontal } from "lucide-react";
+import { ArrowUpRight, PieChart, RefreshCcw, Wallet, Target, Users, Bell, Landmark, Smartphone, CreditCard, MoreHorizontal, CheckCheck, CircleAlert, Info } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -132,14 +132,6 @@ type AccountTransaction = {
   createdAt?: string;
 };
 
-type NotificationPreferences = {
-  budgetNearEnabled: boolean;
-  budgetOverEnabled: boolean;
-  smartSpikeEnabled: boolean;
-  smartLargeExpenseEnabled: boolean;
-  smartCategorySurgeEnabled: boolean;
-};
-
 const palette = ["#f59e0b", "#3b82f6", "#8b5cf6", "#14b8a6", "#ef4444", "#22c55e"];
 const READ_NOTIFICATIONS_STORAGE_KEY = "trackit.notifications.read.v1";
 const ACCOUNT_ORDER_STORAGE_KEY = "trackit.dashboard.account-order.v1";
@@ -182,11 +174,8 @@ export function DashboardDashboard() {
   const [preferredCurrency, setPreferredCurrency] = useState<Currency>("USD");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [notificationPreferences, setNotificationPreferences] =
-    useState<NotificationPreferences | null>(null);
-  const [loadingPreferences, setLoadingPreferences] = useState(false);
-  const [savingPreferenceKey, setSavingPreferenceKey] = useState<keyof NotificationPreferences | null>(null);
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(new Set());
+  const [notificationView, setNotificationView] = useState<"UNREAD" | "ALL">("UNREAD");
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [accountView, setAccountView] = useState<"ALL" | "DEBIT" | "CREDIT">("ALL");
   const [accountCardsAnimated, setAccountCardsAnimated] = useState(true);
@@ -431,6 +420,49 @@ export function DashboardDashboard() {
   }, [debitNetWorth, previousDebitNetWorth]);
   const warningCount = notifications.filter((n) => n.severity === "warning" && !readNotificationIds.has(n.id)).length;
   const unreadCount = notifications.filter((n) => !readNotificationIds.has(n.id)).length;
+  const unreadNotifications = useMemo(
+    () => notifications.filter((item) => !readNotificationIds.has(item.id)),
+    [notifications, readNotificationIds]
+  );
+  const visibleNotifications = useMemo(
+    () =>
+      (notificationView === "UNREAD" ? unreadNotifications : notifications)
+        .slice()
+        .sort(
+          (left, right) =>
+            new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+        ),
+    [notificationView, notifications, unreadNotifications]
+  );
+  const groupedVisibleNotifications = useMemo(() => {
+    const grouped = {
+      "Just now": [] as NotificationItem[],
+      "Last hour": [] as NotificationItem[],
+      Today: [] as NotificationItem[],
+      Yesterday: [] as NotificationItem[],
+      "This week": [] as NotificationItem[],
+      Earlier: [] as NotificationItem[],
+    };
+
+    for (const item of visibleNotifications) {
+      const bucket = getNotificationBucketLabel(item.createdAt);
+      grouped[bucket].push(item);
+    }
+
+    let displayIndex = 0;
+    return (Object.entries(grouped) as Array<[
+      keyof typeof grouped,
+      NotificationItem[],
+    ]>)
+      .filter(([, items]) => items.length > 0)
+      .map(([label, items]) => ({
+        label,
+        items: items.map((item) => ({
+          item,
+          displayIndex: displayIndex++,
+        })),
+      }));
+  }, [visibleNotifications]);
 
   useEffect(() => {
     if (accountCards.length === 0) {
@@ -518,59 +550,14 @@ export function DashboardDashboard() {
     void ensureAccountTransactionsLoaded();
   }
 
-  async function loadNotificationPreferences() {
-    try {
-      setLoadingPreferences(true);
-      const response = await fetch("/api/notifications/preferences");
-      if (!response.ok) {
-        throw new Error("Failed to fetch preferences");
-      }
-      const json = (await response.json()) as { data?: NotificationPreferences };
-      if (json.data) {
-        setNotificationPreferences(json.data);
-      }
-    } catch {
-      setNotificationPreferences(null);
-    } finally {
-      setLoadingPreferences(false);
-    }
-  }
-
-  async function updateNotificationPreference(
-    key: keyof NotificationPreferences,
-    value: boolean
-  ) {
-    const previous = notificationPreferences;
-    setSavingPreferenceKey(key);
-    setNotificationPreferences((current) =>
-      current ? { ...current, [key]: value } : current
-    );
-
-    try {
-      const response = await fetch("/api/notifications/preferences", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [key]: value }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update preference");
-      }
-
-      await loadNotifications();
-    } catch {
-      setNotificationPreferences(previous);
-    } finally {
-      setSavingPreferenceKey(null);
-    }
-  }
-
   function toggleNotifications() {
     const nextState = !notificationsOpen;
     setNotificationsOpen(nextState);
     if (nextState) {
+      if (unreadCount === 0 && notifications.length > 0) {
+        setNotificationView("ALL");
+      }
       loadNotifications();
-      loadNotificationPreferences();
     }
   }
 
@@ -685,25 +672,21 @@ export function DashboardDashboard() {
                 Collaboration
               </Button>
             </a>
-            <a href="/profile" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full justify-center border-slate-300/70 bg-white/70 text-slate-700 shadow-none hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 sm:w-auto">
-                <User className="h-4 w-4" />
-                Settings
-              </Button>
-            </a>
             <div className="relative z-50 col-span-2 w-full sm:col-span-1 sm:w-auto" ref={notificationsRef}>
               <button
                 type="button"
                 onClick={toggleNotifications}
-                className="relative inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-300/70 bg-white/70 px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-200 ease-out hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 motion-reduce:transition-none sm:w-auto"
+                className="relative inline-flex w-full items-center justify-center gap-2 rounded-full border border-amber-200/90 bg-gradient-to-r from-white to-amber-50/80 px-4 py-2.5 text-sm font-medium text-amber-900 transition-all duration-200 ease-out hover:border-amber-300 hover:from-amber-50/80 hover:to-amber-100/70 dark:border-amber-700/60 dark:from-slate-900/95 dark:to-amber-900/20 dark:text-amber-100 dark:hover:border-amber-600 dark:hover:to-amber-900/30 motion-reduce:transition-none sm:w-auto"
               >
                 <Bell className="h-4 w-4" />
                 Notifications
-                {warningCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-xs font-semibold text-white">
-                    {warningCount}
-                  </span>
-                ) : null}
+                <span
+                  className={`absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-semibold text-white ${
+                    warningCount > 0 ? "bg-rose-500" : unreadCount > 0 ? "bg-sky-500" : "bg-emerald-500"
+                  }`}
+                >
+                  {warningCount > 0 ? warningCount : unreadCount > 0 ? unreadCount : "0"}
+                </span>
               </button>
 
               {notificationsOpen ? (
@@ -714,147 +697,164 @@ export function DashboardDashboard() {
                   onClick={() => setNotificationsOpen(false)}
                   className="fixed inset-0 z-40 bg-slate-900/30 sm:hidden"
                 />
-                <div className="fixed left-3 top-24 z-[90] max-h-[70vh] w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-800 dark:bg-slate-900 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:z-[90] sm:mt-2 sm:max-h-none sm:w-[360px]">
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      Notifications ({unreadCount} unread)
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={markAllNotificationsAsRead}
-                        disabled={notifications.length === 0 || unreadCount === 0}
-                        className="text-xs text-slate-500 transition-colors duration-200 ease-out hover:text-slate-700 disabled:cursor-not-allowed disabled:text-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:disabled:text-slate-600"
-                      >
-                        Mark all read
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          loadNotifications();
-                          loadNotificationPreferences();
-                        }}
-                        className="text-xs text-slate-500 transition-colors duration-200 ease-out hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                      >
-                        Refresh
-                      </button>
+                <div className="fixed left-3 top-24 z-[90] max-h-[72vh] w-[calc(100vw-1.5rem)] overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur-xl dark:border-slate-700/80 dark:bg-slate-900/95 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:z-[90] sm:mt-2 sm:max-h-none sm:w-[420px]">
+                  <div className="relative overflow-hidden border-b border-slate-200/80 bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 px-4 py-3 dark:border-slate-700/70 dark:from-amber-900/25 dark:via-slate-900 dark:to-rose-900/25">
+                    <div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-white/40 blur-2xl dark:bg-white/10" />
+                    <div className="relative flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700/90 dark:text-amber-300/90">
+                          Notification Center
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          {unreadCount} unread · {warningCount} urgent
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={markAllNotificationsAsRead}
+                          disabled={notifications.length === 0 || unreadCount === 0}
+                          className="inline-flex items-center gap-1 rounded-full border border-slate-300/70 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-600/70 dark:bg-slate-900/75 dark:text-slate-200 dark:hover:bg-slate-900"
+                        >
+                          <CheckCheck className="h-3.5 w-3.5" />
+                          Mark all
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            loadNotifications();
+                          }}
+                          className="inline-flex items-center gap-1 rounded-full border border-slate-300/70 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-white dark:border-slate-600/70 dark:bg-slate-900/75 dark:text-slate-200 dark:hover:bg-slate-900"
+                        >
+                          <RefreshCcw className="h-3 w-3" />
+                          Refresh
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 dark:border-slate-700 dark:bg-slate-950/50">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      Alert settings
-                    </p>
-                    {loadingPreferences ? (
-                      <Skeleton variant="rounded" animation="wave" height={72} className="rounded-lg" />
-                    ) : notificationPreferences ? (
-                      <div className="space-y-1">
-                        <PreferenceToggle
-                          label="Near budget"
-                          checked={notificationPreferences.budgetNearEnabled}
-                          disabled={savingPreferenceKey === "budgetNearEnabled"}
-                          onChange={(checked) =>
-                            updateNotificationPreference("budgetNearEnabled", checked)
-                          }
-                        />
-                        <PreferenceToggle
-                          label="Over budget"
-                          checked={notificationPreferences.budgetOverEnabled}
-                          disabled={savingPreferenceKey === "budgetOverEnabled"}
-                          onChange={(checked) =>
-                            updateNotificationPreference("budgetOverEnabled", checked)
-                          }
-                        />
-                        <PreferenceToggle
-                          label="Monthly spike"
-                          checked={notificationPreferences.smartSpikeEnabled}
-                          disabled={savingPreferenceKey === "smartSpikeEnabled"}
-                          onChange={(checked) =>
-                            updateNotificationPreference("smartSpikeEnabled", checked)
-                          }
-                        />
-                        <PreferenceToggle
-                          label="Large expense"
-                          checked={notificationPreferences.smartLargeExpenseEnabled}
-                          disabled={savingPreferenceKey === "smartLargeExpenseEnabled"}
-                          onChange={(checked) =>
-                            updateNotificationPreference("smartLargeExpenseEnabled", checked)
-                          }
-                        />
-                        <PreferenceToggle
-                          label="Category surge"
-                          checked={notificationPreferences.smartCategorySurgeEnabled}
-                          disabled={savingPreferenceKey === "smartCategorySurgeEnabled"}
-                          onChange={(checked) =>
-                            updateNotificationPreference("smartCategorySurgeEnabled", checked)
-                          }
-                        />
+
+                  <div className="border-b border-slate-200/75 px-4 py-3 dark:border-slate-700/70">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="inline-flex rounded-full border border-slate-200 bg-slate-100/80 p-1 dark:border-slate-700 dark:bg-slate-800/80">
+                        <button
+                          type="button"
+                          onClick={() => setNotificationView("UNREAD")}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                            notificationView === "UNREAD"
+                              ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100"
+                              : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+                          }`}
+                        >
+                          Unread ({unreadNotifications.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNotificationView("ALL")}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                            notificationView === "ALL"
+                              ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100"
+                              : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+                          }`}
+                        >
+                          All ({notifications.length})
+                        </button>
                       </div>
-                    ) : (
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Unable to load preferences right now.
-                      </p>
-                    )}
+                      <a
+                        href="/profile"
+                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                      >
+                        Manage alerts
+                      </a>
+                    </div>
                   </div>
-                  <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+
+                  <div className="max-h-[38vh] space-y-3 overflow-y-auto px-4 pb-3 pr-3">
                     {loadingNotifications ? (
                       Array.from({ length: 3 }).map((_, index) => (
                         <Skeleton
                           key={index}
                           variant="rounded"
                           animation="wave"
-                          height={64}
-                          className="rounded-xl"
+                          height={82}
+                          className="rounded-2xl"
                         />
                       ))
-                    ) : notifications.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-slate-200 px-3 py-6 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                        No notifications right now.
+                    ) : visibleNotifications.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-300/80 bg-white/80 px-3 py-8 text-center text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+                        {notificationView === "UNREAD" ? "No unread notifications." : "No notifications right now."}
                       </div>
                     ) : (
-                      notifications.map((item) => {
-                        const isRead = readNotificationIds.has(item.id);
-                        return (
-                        <article
-                          key={item.id}
-                          className={`rounded-xl border px-3 py-2 ${
-                            item.severity === "warning"
-                              ? "border-rose-200 bg-rose-50 dark:border-rose-800 dark:bg-rose-900/20"
-                              : "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
-                          } ${isRead ? "opacity-70" : ""}`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <p
-                              className={`text-xs font-semibold ${
-                                item.severity === "warning"
-                                  ? "text-rose-800 dark:text-rose-300"
-                                  : "text-blue-800 dark:text-blue-300"
-                              }`}
-                            >
-                              {item.title}
-                            </p>
-                            {isRead ? (
-                              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Read</span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => markNotificationAsRead(item.id)}
-                                className="text-[11px] font-medium text-slate-500 transition-colors duration-200 ease-out hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                              >
-                                Mark read
-                              </button>
-                            )}
-                          </div>
-                          <p className="mt-0.5 text-xs text-slate-700 dark:text-slate-200">
-                            {item.message}
+                      groupedVisibleNotifications.map((group) => (
+                        <section key={group.label} className="space-y-2">
+                          <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                            {group.label}
                           </p>
-                        </article>
-                        );
-                      })
+                          {group.items.map(({ item, displayIndex }) => {
+                            const isRead = readNotificationIds.has(item.id);
+                            const isWarning = item.severity === "warning";
+                            return (
+                            <article
+                              key={item.id}
+                              className={`group rounded-2xl border p-3 opacity-0 transition-all animate-[page-enter_260ms_ease-out_forwards] ${
+                                isWarning
+                                  ? "border-rose-200/80 bg-gradient-to-br from-rose-50/95 to-white dark:border-rose-800/70 dark:from-rose-900/25 dark:to-slate-900"
+                                  : "border-sky-200/80 bg-gradient-to-br from-sky-50/90 to-white dark:border-sky-800/70 dark:from-sky-900/20 dark:to-slate-900"
+                              } ${isRead ? "opacity-70" : "shadow-sm"}`}
+                              style={{ animationDelay: `${Math.min(displayIndex, 10) * 35}ms` }}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex min-w-0 items-start gap-2">
+                                  <span
+                                    className={`mt-0.5 inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg ${
+                                      isWarning
+                                        ? "bg-rose-500/15 text-rose-700 dark:bg-rose-400/20 dark:text-rose-200"
+                                        : "bg-sky-500/15 text-sky-700 dark:bg-sky-400/20 dark:text-sky-200"
+                                    }`}
+                                  >
+                                    {isWarning ? <CircleAlert className="h-3.5 w-3.5" /> : <Info className="h-3.5 w-3.5" />}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p
+                                      className={`truncate text-xs font-semibold ${
+                                        isWarning
+                                          ? "text-rose-900 dark:text-rose-200"
+                                          : "text-sky-900 dark:text-sky-200"
+                                      }`}
+                                    >
+                                      {item.title}
+                                    </p>
+                                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                      {formatRelativeTime(item.createdAt)}
+                                    </p>
+                                  </div>
+                                </div>
+                                {isRead ? (
+                                  <span className="inline-flex items-center rounded-full bg-slate-200/75 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-700/70 dark:text-slate-300">
+                                    Read
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => markNotificationAsRead(item.id)}
+                                    className="inline-flex items-center rounded-full border border-slate-300/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 transition-colors hover:border-slate-400 hover:text-slate-900 dark:border-slate-600/80 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
+                                  >
+                                    Mark read
+                                  </button>
+                                )}
+                              </div>
+                              <p className="mt-2 text-xs leading-relaxed text-slate-700 dark:text-slate-200">
+                                {item.message}
+                              </p>
+                            </article>
+                            );
+                          })}
+                        </section>
+                      ))
                     )}
                   </div>
                   <a
                     href="/transactions"
-                    className="mt-2 block rounded-lg border border-slate-200 px-3 py-2 text-center text-xs font-medium text-slate-600 transition-all duration-200 ease-out hover:bg-slate-50 hover:shadow-sm dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 motion-reduce:transition-none"
+                    className="m-3 mt-1 block rounded-xl border border-slate-200 bg-white/85 px-3 py-2 text-center text-xs font-semibold text-slate-700 transition-all duration-200 ease-out hover:bg-white hover:shadow-sm dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-900 motion-reduce:transition-none"
                   >
                     Open transactions dashboard
                   </a>
@@ -1625,31 +1625,6 @@ function MetricCard({
   );
 }
 
-function PreferenceToggle({
-  label,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="flex items-center justify-between gap-2 rounded-md px-1 py-1 text-xs text-slate-700 dark:text-slate-200">
-      <span>{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500 disabled:opacity-50"
-      />
-    </label>
-  );
-}
-
 function StatRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0 dark:border-slate-700">
@@ -1682,6 +1657,75 @@ function formatPercent(value: number | null) {
   }
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
+}
+
+function formatRelativeTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Recently";
+  }
+
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) {
+    return "Just now";
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) {
+    return `${days}d ago`;
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getNotificationBucketLabel(
+  value: string
+): "Just now" | "Last hour" | "Today" | "Yesterday" | "This week" | "Earlier" {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Earlier";
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  if (diffMs <= 60_000) {
+    return "Just now";
+  }
+
+  if (diffMs <= 3_600_000) {
+    return "Last hour";
+  }
+
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayDiff = Math.floor((todayStart.getTime() - targetStart.getTime()) / 86400000);
+
+  if (dayDiff <= 0) {
+    return "Today";
+  }
+
+  if (dayDiff === 1) {
+    return "Yesterday";
+  }
+
+  if (dayDiff < 7) {
+    return "This week";
+  }
+
+  return "Earlier";
 }
 
 function ChartTooltip({
