@@ -37,8 +37,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       <div className="pointer-events-none fixed bottom-0 right-0 z-50 flex w-full max-w-md flex-col gap-3 p-4 sm:p-6">
-        {toasts.map((toast) => (
-          <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
+        {toasts.map((toast, index) => (
+          <ToastItem key={toast.id} toast={toast} index={index} onRemove={removeToast} />
         ))}
       </div>
     </ToastContext.Provider>
@@ -47,9 +47,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 function ToastItem({
   toast,
+  index,
   onRemove,
 }: {
   toast: Toast;
+  index: number;
   onRemove: (id: string) => void;
 }) {
   const [visible, setVisible] = useState(false);
@@ -78,43 +80,64 @@ function ToastItem({
   };
 
   const styles = {
-    success: "bg-green-50 border-green-200 text-green-900",
-    error: "bg-red-50 border-red-200 text-red-900",
-    info: "bg-blue-50 border-blue-200 text-blue-900",
-    warning: "bg-amber-50 border-amber-200 text-amber-900",
+    success:
+      "border-emerald-200/90 bg-gradient-to-br from-emerald-50/95 via-white/95 to-emerald-100/80 text-emerald-950 shadow-[0_12px_38px_-18px_rgba(5,150,105,0.55)] dark:border-emerald-500/25 dark:from-emerald-500/20 dark:via-slate-900/92 dark:to-slate-900/95 dark:text-emerald-100",
+    error:
+      "border-rose-200/90 bg-gradient-to-br from-rose-50/95 via-white/95 to-rose-100/80 text-rose-950 shadow-[0_12px_38px_-18px_rgba(225,29,72,0.55)] dark:border-rose-500/25 dark:from-rose-500/20 dark:via-slate-900/92 dark:to-slate-900/95 dark:text-rose-100",
+    info:
+      "border-sky-200/90 bg-gradient-to-br from-sky-50/95 via-white/95 to-sky-100/80 text-sky-950 shadow-[0_12px_38px_-18px_rgba(2,132,199,0.55)] dark:border-sky-500/25 dark:from-sky-500/20 dark:via-slate-900/92 dark:to-slate-900/95 dark:text-sky-100",
+    warning:
+      "border-amber-200/90 bg-gradient-to-br from-amber-50/95 via-white/95 to-amber-100/80 text-amber-950 shadow-[0_12px_38px_-18px_rgba(217,119,6,0.5)] dark:border-amber-500/25 dark:from-amber-500/20 dark:via-slate-900/92 dark:to-slate-900/95 dark:text-amber-100",
   };
 
   const iconStyles = {
-    success: "text-green-600",
-    error: "text-red-600",
-    info: "text-blue-600",
-    warning: "text-amber-600",
+    success:
+      "bg-emerald-500/15 text-emerald-700 ring-1 ring-emerald-500/25 dark:bg-emerald-300/15 dark:text-emerald-200 dark:ring-emerald-300/25",
+    error:
+      "bg-rose-500/15 text-rose-700 ring-1 ring-rose-500/25 dark:bg-rose-300/15 dark:text-rose-200 dark:ring-rose-300/25",
+    info:
+      "bg-sky-500/15 text-sky-700 ring-1 ring-sky-500/25 dark:bg-sky-300/15 dark:text-sky-200 dark:ring-sky-300/25",
+    warning:
+      "bg-amber-500/20 text-amber-700 ring-1 ring-amber-500/25 dark:bg-amber-300/20 dark:text-amber-200 dark:ring-amber-300/30",
+  };
+
+  const progressStyles = {
+    success: "from-emerald-500/80 via-emerald-400/80 to-emerald-300/80",
+    error: "from-rose-500/85 via-rose-400/80 to-rose-300/80",
+    info: "from-sky-500/85 via-cyan-400/80 to-sky-300/75",
+    warning: "from-amber-500/90 via-amber-400/85 to-yellow-300/75",
   };
 
   const Icon = icons[toast.type];
 
   return (
     <div
-      className={`pointer-events-auto relative overflow-hidden rounded-2xl border p-4 shadow-lg backdrop-blur transition-all duration-200 ease-out ${styles[toast.type]} ${
-        visible ? "translate-x-0 opacity-100" : "translate-x-3 opacity-0"
+      role={toast.type === "error" ? "alert" : "status"}
+      aria-live={toast.type === "error" ? "assertive" : "polite"}
+      className={`pointer-events-auto relative overflow-hidden rounded-2xl border p-4 backdrop-blur-xl transition-all duration-300 ease-out ${styles[toast.type]} ${
+        visible ? "translate-x-0 translate-y-0 opacity-100" : "translate-x-5 translate-y-1 opacity-0"
       }`}
+      style={{ transitionDelay: `${Math.min(index, 4) * 45}ms` }}
     >
-      <div className="flex items-start gap-3">
-        <Icon className={`h-5 w-5 flex-shrink-0 ${iconStyles[toast.type]}`} />
-        <p className="flex-1 text-sm font-medium leading-relaxed">{toast.message}</p>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.42),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.07),transparent_42%)]" />
+      <div className="relative flex items-start gap-3">
+        <span className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl ${iconStyles[toast.type]}`}>
+          <Icon className="h-4.5 w-4.5" />
+        </span>
+        <p className="flex-1 pr-1 text-sm font-semibold leading-relaxed tracking-tight">{toast.message}</p>
         <button
           onClick={() => {
             triggerHaptic("light");
             setVisible(false);
           }}
-          className="flex-shrink-0 cursor-pointer rounded-full p-1 transition-colors hover:bg-black/5"
+          className="flex-shrink-0 cursor-pointer rounded-full p-1.5 text-slate-600/85 transition-all duration-150 hover:bg-black/10 hover:text-slate-900 dark:text-slate-300/85 dark:hover:bg-white/10 dark:hover:text-white"
           aria-label="Close notification"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-1 origin-left bg-black/10 dark:bg-white/10"
+        className={`pointer-events-none absolute inset-x-0 bottom-0 h-1 origin-left rounded-b-2xl bg-gradient-to-r ${progressStyles[toast.type]}`}
         style={{
           transform: visible ? "scaleX(0)" : "scaleX(1)",
           transition: `transform ${toast.durationMs}ms linear`,
