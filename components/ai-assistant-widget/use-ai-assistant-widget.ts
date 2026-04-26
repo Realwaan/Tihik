@@ -1,102 +1,14 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { initialMessage } from "./ai-assistant-widget-helpers";
+import { createSpeechRecognition, type SpeechRecognitionLike } from "./ai-assistant-dictation";
+import { buildRecentHistory, createMessageId } from "./ai-assistant-messages";
+import {
+  buildHistoryStorageKey,
+  compactMessagesForStorage,
+  normalizeStoredMessages,
+} from "./ai-assistant-storage";
 import type { AssistantCurrency, ChatMessage } from "./ai-assistant-widget-types";
-
-const AI_HISTORY_STORAGE_PREFIX = "trackit-ai-history-v1";
-const MAX_STORED_MESSAGES = 60;
-const MAX_STORED_CONTENT_LENGTH = 4000;
-
-type SpeechRecognitionAlternativeLike = {
-  transcript?: string;
-};
-
-type SpeechRecognitionResultLike = ArrayLike<SpeechRecognitionAlternativeLike>;
-
-type SpeechRecognitionEventLike = {
-  results: ArrayLike<SpeechRecognitionResultLike>;
-};
-
-type SpeechRecognitionLike = {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-
-type SpeechRecognitionConstructorLike = new () => SpeechRecognitionLike;
-
-type BrowserWindowWithSpeechRecognition = Window & {
-  SpeechRecognition?: SpeechRecognitionConstructorLike;
-  webkitSpeechRecognition?: SpeechRecognitionConstructorLike;
-};
-
-function buildHistoryStorageKey(userId: string | null): string {
-  return `${AI_HISTORY_STORAGE_PREFIX}:${userId?.trim() || "guest"}`;
-}
-
-function normalizeStoredMessages(raw: unknown): ChatMessage[] {
-  if (!Array.isArray(raw)) {
-    return [initialMessage];
-  }
-
-  const restored = raw
-    .map((item, index): ChatMessage | null => {
-      if (!item || typeof item !== "object") {
-        return null;
-      }
-
-      const record = item as Record<string, unknown>;
-      const role =
-        record.role === "assistant" || record.role === "user" ? record.role : null;
-      const content =
-        typeof record.content === "string"
-          ? record.content.trim().slice(0, MAX_STORED_CONTENT_LENGTH)
-          : "";
-
-      if (!role || !content) {
-        return null;
-      }
-
-      const id =
-        typeof record.id === "string" && record.id.trim().length > 0
-          ? record.id
-          : `restored-${role}-${index}`;
-
-      return {
-        id,
-        role,
-        content,
-      };
-    })
-    .filter((item): item is ChatMessage => Boolean(item));
-
-  if (restored.length === 0) {
-    return [initialMessage];
-  }
-
-  return restored.slice(-MAX_STORED_MESSAGES);
-}
-
-function compactMessagesForStorage(messages: ChatMessage[]): ChatMessage[] {
-  return messages.slice(-MAX_STORED_MESSAGES).map((message) => ({
-    ...message,
-    content: message.content.slice(0, MAX_STORED_CONTENT_LENGTH),
-  }));
-}
-
-function createMessageId(role: ChatMessage["role"], variant: string): string {
-  const random =
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2, 10);
-
-  return `${Date.now()}-${role}-${variant}-${random}`;
-}
 
 export function useAiAssistantWidget() {
   const [open, setOpen] = useState(false);
@@ -180,37 +92,11 @@ export function useAiAssistantWidget() {
   }, [messages, historyStorageKey]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const browserWindow = window as BrowserWindowWithSpeechRecognition;
-    const SpeechRecognitionCtor =
-      browserWindow.SpeechRecognition || browserWindow.webkitSpeechRecognition;
-
-    if (!SpeechRecognitionCtor) {
+    const recognition = createSpeechRecognition(setInput, setDictating);
+    if (!recognition) {
       setDictationSupported(false);
       return;
     }
-
-    const recognition = new SpeechRecognitionCtor();
-    recognition.lang = "en-US";
-    recognition.interimResults = true;
-    recognition.continuous = false;
-
-    recognition.onresult = (event: SpeechRecognitionEventLike) => {
-      const transcript = Array.from(event.results)
-        .map((result) => result[0]?.transcript ?? "")
-        .join(" ")
-        .trim();
-
-      if (transcript) {
-        setInput((current) => transcript);
-      }
-    };
-
-    recognition.onend = () => setDictating(false);
-    recognition.onerror = () => setDictating(false);
 
     speechRecognitionRef.current = recognition;
     setDictationSupported(true);
@@ -226,14 +112,7 @@ export function useAiAssistantWidget() {
   }, []);
 
   const recentHistory = useMemo(
-    () =>
-      messages
-        .filter((message) => message.id !== "welcome")
-        .slice(-4)
-        .map((message) => ({
-          role: message.role,
-          content: message.content.slice(0, 500),
-        })),
+    () => buildRecentHistory(messages),
     [messages]
   );
 
