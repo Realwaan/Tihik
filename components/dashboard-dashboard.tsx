@@ -697,10 +697,10 @@ export function DashboardDashboard() {
                   onClick={() => setNotificationsOpen(false)}
                   className="fixed inset-0 z-40 bg-slate-900/30 sm:hidden"
                 />
-                <div className="fixed left-3 top-24 z-[90] max-h-[72vh] w-[calc(100vw-1.5rem)] overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur-xl dark:border-slate-700/80 dark:bg-slate-900/95 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:z-[90] sm:mt-2 sm:max-h-none sm:w-[420px]">
+                <div className="fixed inset-x-2 top-[max(5.5rem,calc(env(safe-area-inset-top)+4.5rem))] z-[90] max-h-[min(78dvh,calc(100dvh-6rem))] overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur-xl dark:border-slate-700/80 dark:bg-slate-900/95 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:z-[90] sm:mt-2 sm:max-h-none sm:w-[420px]">
                   <div className="relative overflow-hidden border-b border-slate-200/80 bg-gradient-to-r from-amber-50 via-orange-50 to-rose-50 px-4 py-3 dark:border-slate-700/70 dark:from-amber-900/25 dark:via-slate-900 dark:to-rose-900/25">
                     <div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-white/40 blur-2xl dark:bg-white/10" />
-                    <div className="relative flex items-start justify-between gap-3">
+                    <div className="relative flex flex-wrap items-start justify-between gap-2.5 sm:flex-nowrap sm:gap-3">
                       <div>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700/90 dark:text-amber-300/90">
                           Notification Center
@@ -709,7 +709,7 @@ export function DashboardDashboard() {
                           {unreadCount} unread · {warningCount} urgent
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
                         <button
                           type="button"
                           onClick={markAllNotificationsAsRead}
@@ -734,12 +734,12 @@ export function DashboardDashboard() {
                   </div>
 
                   <div className="border-b border-slate-200/75 px-4 py-3 dark:border-slate-700/70">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="inline-flex rounded-full border border-slate-200 bg-slate-100/80 p-1 dark:border-slate-700 dark:bg-slate-800/80">
+                    <div className="flex flex-wrap items-center justify-between gap-2.5 sm:flex-nowrap sm:gap-3">
+                      <div className="inline-flex max-w-full overflow-x-auto rounded-full border border-slate-200 bg-slate-100/80 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-slate-700 dark:bg-slate-800/80">
                         <button
                           type="button"
                           onClick={() => setNotificationView("UNREAD")}
-                          className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                          className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold transition ${
                             notificationView === "UNREAD"
                               ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100"
                               : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
@@ -750,7 +750,7 @@ export function DashboardDashboard() {
                         <button
                           type="button"
                           onClick={() => setNotificationView("ALL")}
-                          className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                          className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold transition ${
                             notificationView === "ALL"
                               ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-100"
                               : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
@@ -761,14 +761,14 @@ export function DashboardDashboard() {
                       </div>
                       <a
                         href="/profile"
-                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                       >
                         Manage alerts
                       </a>
                     </div>
                   </div>
 
-                  <div className="max-h-[38vh] space-y-3 overflow-y-auto px-4 pb-3 pr-3">
+                  <div className="max-h-[46dvh] space-y-3 overflow-y-auto px-4 pb-3 pr-3 sm:max-h-[24rem]">
                     {loadingNotifications ? (
                       Array.from({ length: 3 }).map((_, index) => (
                         <Skeleton
@@ -1135,7 +1135,7 @@ export function DashboardDashboard() {
                             <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${cardTheme.balanceLabelClass}`}>
                               Current Balance
                             </p>
-                            <p className={`mt-1 truncate text-3xl font-semibold tracking-tight ${cardTheme.balanceValueClass}`}>
+                            <p className={`mt-1 truncate text-[1.65rem] font-semibold leading-tight tracking-tight min-[390px]:text-3xl ${cardTheme.balanceValueClass}`}>
                               {formatCurrency(account.balance, preferredCurrency)}
                             </p>
                             <p className={`mt-1 truncate text-xs font-medium ${cardTheme.subtitleClass}`}>
@@ -1167,7 +1167,7 @@ export function DashboardDashboard() {
                             </div>
                             {openAccountMenuId === account.id ? (
                               <div
-                                className="absolute right-0 top-9 z-20 min-w-[9.5rem] rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+                                className="absolute right-0 top-9 z-20 min-w-[8.75rem] max-w-[calc(100vw-3rem)] rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900"
                                 onClick={(event) => event.stopPropagation()}
                               >
                                 <button
@@ -1221,12 +1221,12 @@ export function DashboardDashboard() {
                         <div className="mt-6 flex items-end justify-between gap-3 pr-11">
                           {isCreditCardAccount ? (
                             <>
-                              <p className={`text-lg font-medium tracking-[0.06em] ${cardTheme.titleClass}`}>{pseudoNumber}</p>
+                              <p className={`truncate text-sm font-medium tracking-[0.045em] min-[390px]:text-base ${cardTheme.titleClass}`}>{pseudoNumber}</p>
                               <div className="text-right">
                                 <p className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${cardTheme.balanceLabelClass}`}>
                                   Valid Thru
                                 </p>
-                                <p className={`text-lg font-semibold ${cardTheme.titleClass}`}>{pseudoExpiry}</p>
+                                <p className={`text-base font-semibold min-[390px]:text-lg ${cardTheme.titleClass}`}>{pseudoExpiry}</p>
                               </div>
                             </>
                           ) : (

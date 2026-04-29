@@ -24,9 +24,9 @@ export function Button({
   }[variant];
 
   const sizeClass = {
-    default: "h-10 rounded-full px-4 py-2 text-sm font-medium",
-    sm: "h-9 rounded-lg px-3 py-2 text-sm",
-    icon: "h-10 w-10 rounded-full",
+    default: "h-11 rounded-full px-4 py-2 text-sm font-medium sm:h-10",
+    sm: "h-10 rounded-lg px-3 py-2 text-sm sm:h-9",
+    icon: "h-11 w-11 rounded-full sm:h-10 sm:w-10",
   }[size];
 
   return (

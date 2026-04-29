@@ -9,17 +9,18 @@ import { triggerHaptic } from "@/lib/haptics";
 
 type NavItem = {
   label: string;
+  shortLabel: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
 };
 
 const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: House },
-  { label: "Transactions", href: "/transactions", icon: Repeat2 },
-  { label: "Budgets", href: "/budgets", icon: BarChart3 },
-  { label: "Plan", href: "/plan", icon: Wallet },
-  { label: "Collaboration", href: "/collaboration", icon: Users },
-  { label: "Profile", href: "/profile", icon: HandCoins },
+  { label: "Dashboard", shortLabel: "Home", href: "/dashboard", icon: House },
+  { label: "Transactions", shortLabel: "Txns", href: "/transactions", icon: Repeat2 },
+  { label: "Budgets", shortLabel: "Budget", href: "/budgets", icon: BarChart3 },
+  { label: "Plan", shortLabel: "Plan", href: "/plan", icon: Wallet },
+  { label: "Collaboration", shortLabel: "Team", href: "/collaboration", icon: Users },
+  { label: "Profile", shortLabel: "Me", href: "/profile", icon: HandCoins },
 ];
 
 function isActivePath(pathname: string, href: string) {
@@ -78,7 +79,7 @@ export function MobileNavDock() {
 
   return (
     <nav ref={dockRef} className="fixed inset-x-0 bottom-2 z-40 px-3 lg:bottom-2">
-      <div className="mx-auto flex max-w-5xl items-center justify-between rounded-3xl border border-slate-200/80 bg-white/90 px-2 py-2 shadow-lg backdrop-blur dark:border-slate-700/80 dark:bg-slate-900/90 lg:max-w-3xl lg:rounded-2xl lg:border-white/15 lg:bg-white/75 lg:px-1.5 lg:py-1.5 lg:shadow-[0_12px_30px_rgba(15,23,42,0.14)] dark:lg:bg-slate-900/75 dark:lg:shadow-[0_12px_30px_rgba(2,6,23,0.5)]">
+      <div className="mx-auto flex max-w-5xl snap-x snap-mandatory items-center gap-1 overflow-x-auto rounded-3xl border border-slate-200/80 bg-white/90 px-2 py-2 shadow-lg backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-slate-700/80 dark:bg-slate-900/90 lg:max-w-3xl lg:rounded-2xl lg:border-white/15 lg:bg-white/75 lg:px-1.5 lg:py-1.5 lg:shadow-[0_12px_30px_rgba(15,23,42,0.14)] dark:lg:bg-slate-900/75 dark:lg:shadow-[0_12px_30px_rgba(2,6,23,0.5)]">
         {navItems.map((item, index) => {
           const Icon = item.icon;
           const active = isActivePath(pathname, item.href);
@@ -88,7 +89,7 @@ export function MobileNavDock() {
               key={`mobile-${item.href}`}
               href={item.href}
               onClick={() => triggerHaptic("light")}
-              className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-2xl px-2 py-1.5 text-[11px] font-medium transition-all duration-300 ease-out motion-reduce:transition-none sm:text-xs lg:gap-0.5 lg:px-1.5 lg:py-1.25 lg:text-[10px] ${
+              className={`flex min-w-[4.6rem] flex-none snap-start flex-col items-center gap-1 rounded-2xl px-2 py-1.5 text-[11px] font-medium transition-all duration-300 ease-out motion-reduce:transition-none min-[430px]:min-w-0 min-[430px]:flex-1 sm:text-xs lg:gap-0.5 lg:px-1.5 lg:py-1.25 lg:text-[10px] ${
                 dockReady
                   ? "translate-y-0 opacity-100"
                   : "translate-y-2 opacity-0"
@@ -100,7 +101,8 @@ export function MobileNavDock() {
               style={{ transitionDelay: dockReady ? `${index * 45}ms` : "0ms" }}
             >
               <Icon className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
-              <span className="truncate">{item.label}</span>
+              <span className="min-[390px]:hidden">{item.shortLabel}</span>
+              <span className="hidden min-[390px]:inline">{item.label}</span>
             </Link>
           );
         })}
