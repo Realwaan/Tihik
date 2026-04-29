@@ -8,7 +8,7 @@ export default async function AccountOverviewPage() {
   const session = await auth();
 
   if (!session) {
-    redirect("/");
+    redirect("/signin?callbackUrl=/account-overview");
   }
 
   return (

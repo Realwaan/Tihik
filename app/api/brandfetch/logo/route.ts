@@ -19,6 +19,7 @@ type BrandfetchResponse = {
 };
 
 const BRAND_FETCH_API_BASE_URL = "https://api.brandfetch.io/v2/brands";
+const CLEARBIT_BASE_URL = "https://logo.clearbit.com";
 const CACHE_CONTROL_VALUE = "public, s-maxage=86400, stale-while-revalidate=604800";
 
 const FORMAT_PRIORITY: Record<string, number> = {
@@ -86,6 +87,39 @@ function pickBestLogoSource(payload: BrandfetchResponse): string | null {
   return bestSource;
 }
 
+async function fetchLogoResponse(source: string) {
+  return fetch(source, {
+    headers: {
+      Accept: "image/*,*/*;q=0.8",
+    },
+  });
+}
+
+async function streamImageResponse(source: string, status = 200) {
+  const logoResponse = await fetchLogoResponse(source);
+
+  if (!logoResponse.ok || !logoResponse.body) {
+    return null;
+  }
+
+  const headers = new Headers();
+  const contentType = logoResponse.headers.get("content-type");
+  if (contentType) {
+    headers.set("Content-Type", contentType);
+  }
+  headers.set("Cache-Control", CACHE_CONTROL_VALUE);
+
+  return new NextResponse(logoResponse.body, {
+    status,
+    headers,
+  });
+}
+
+async function fallbackToClearbit(domain: string) {
+  const clearbitSource = `${CLEARBIT_BASE_URL}/${encodeURIComponent(domain)}`;
+  return streamImageResponse(clearbitSource, 200);
+}
+
 export async function GET(request: NextRequest) {
   const domain = normalizeLogoDomain(request.nextUrl.searchParams.get("domain"));
 
@@ -95,6 +129,11 @@ export async function GET(request: NextRequest) {
 
   const apiKey = getBrandfetchApiKey();
   if (!apiKey) {
+    const fallbackResponse = await fallbackToClearbit(domain);
+    if (fallbackResponse) {
+      return fallbackResponse;
+    }
+
     return NextResponse.json(
       { error: "Brandfetch API key is not configured." },
       { status: 503 }
@@ -115,6 +154,11 @@ export async function GET(request: NextRequest) {
     );
 
     if (!response.ok) {
+      const fallbackResponse = await fallbackToClearbit(domain);
+      if (fallbackResponse) {
+        return fallbackResponse;
+      }
+
       const status = response.status === 404 ? 404 : 502;
       return NextResponse.json(
         { error: `Brandfetch lookup failed for ${domain}.` },
@@ -126,38 +170,39 @@ export async function GET(request: NextRequest) {
     const source = pickBestLogoSource(payload);
 
     if (!source) {
+      const fallbackResponse = await fallbackToClearbit(domain);
+      if (fallbackResponse) {
+        return fallbackResponse;
+      }
+
       return NextResponse.json(
         { error: `No logo assets returned for ${domain}.` },
         { status: 404 }
       );
     }
 
-    const logoResponse = await fetch(source, {
-      headers: {
-        Accept: "image/*,*/*;q=0.8",
-      },
-    });
+    const brandfetchLogoResponse = await streamImageResponse(source, 200);
 
-    if (!logoResponse.ok || !logoResponse.body) {
-      return NextResponse.json(
-        { error: `Unable to load logo asset for ${domain}.` },
-        { status: 502 }
-      );
+    if (brandfetchLogoResponse) {
+      return brandfetchLogoResponse;
     }
 
-    const headers = new Headers();
-    const contentType = logoResponse.headers.get("content-type");
-    if (contentType) {
-      headers.set("Content-Type", contentType);
+    const fallbackResponse = await fallbackToClearbit(domain);
+    if (fallbackResponse) {
+      return fallbackResponse;
     }
-    headers.set("Cache-Control", CACHE_CONTROL_VALUE);
 
-    return new NextResponse(logoResponse.body, {
-      status: 200,
-      headers,
-    });
+    return NextResponse.json(
+      { error: `Unable to load logo asset for ${domain}.` },
+      { status: 502 }
+    );
   } catch (error) {
     console.error("Brandfetch logo proxy failed:", error);
+    const fallbackResponse = await fallbackToClearbit(domain);
+    if (fallbackResponse) {
+      return fallbackResponse;
+    }
+
     return NextResponse.json(
       { error: "Unable to fetch logo from Brandfetch." },
       { status: 502 }

@@ -38,7 +38,7 @@ export function AiAssistantWidget() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">TrackIt AI</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Smart finance assistant</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Smart finance assistant powered by NVIDIA</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
