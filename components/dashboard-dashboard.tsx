@@ -2,6 +2,7 @@
 
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { ArrowUpRight, PieChart, RefreshCcw, Wallet, Target, Users, Bell, Landmark, Smartphone, CreditCard, MoreHorizontal, CheckCheck, CircleAlert, Info } from "lucide-react";
 import {
   Bar,
@@ -759,12 +760,12 @@ export function DashboardDashboard() {
                           All ({notifications.length})
                         </button>
                       </div>
-                      <a
+                      <Link
                         href="/profile"
                         className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                       >
                         Manage alerts
-                      </a>
+                      </Link>
                     </div>
                   </div>
 

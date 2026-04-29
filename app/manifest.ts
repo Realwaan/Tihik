@@ -2,14 +2,18 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "TrackIt",
     short_name: "TrackIt",
     description: "Track expenses, budgets, and recurring transactions.",
+    scope: "/",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#ffffff",
     orientation: "portrait",
+    categories: ["finance", "productivity", "business"],
+    prefer_related_applications: false,
     icons: [
       {
         src: "/icons/icon-192.svg",

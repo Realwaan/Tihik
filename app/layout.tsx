@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { AiAssistantWidget } from "@/components/ai-assistant-widget";
@@ -16,6 +17,7 @@ import {
 import { auth } from "@clerk/nextjs/server";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ClerkTopBarVisibility } from "@/components/layout/clerk-top-bar-visibility";
+import { InstallAppButton } from "@/components/install-app-button";
 
 export const viewport = {
   width: "device-width",
@@ -64,14 +66,18 @@ export default async function RootLayout({
               <ClerkTopBarVisibility>
                 <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/85 backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/80">
                   <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-                    <a
+                    <Link
                       href="/"
                       className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-600 dark:text-amber-400"
                     >
                       TrackIt
-                    </a>
+                    </Link>
 
                     <div className="flex items-center gap-2 sm:gap-3">
+                      <InstallAppButton
+                        compactLabel
+                        className="hidden border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 sm:inline-flex"
+                      />
                       <ThemeToggle />
 
                       {!userId ? (

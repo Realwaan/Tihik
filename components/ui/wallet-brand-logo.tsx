@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CreditCard } from "lucide-react";
 
 import { buildBrandfetchLogoProxySource } from "@/lib/brandfetch-logo";
@@ -65,8 +65,8 @@ export function WalletBrandLogo({
   className = "",
 }: WalletBrandLogoProps) {
   const sources = useMemo(() => buildLogoSources(badge, label), [badge, label]);
-  const [sourceIndex, setSourceIndex] = useState(() => (sources.length > 0 ? 0 : -1));
-  const source = sourceIndex >= 0 ? sources[sourceIndex] : null;
+  const [failedSources, setFailedSources] = useState<Record<string, true>>({});
+  const source = sources.find((candidate) => !failedSources[candidate]) ?? null;
   const gradientClass = badge?.logoGradientClass ?? "from-slate-400 to-slate-600";
   const normalizedLabelText = label
     .trim()
@@ -76,18 +76,20 @@ export function WalletBrandLogo({
   const fallbackText =
     badge?.logoText ?? (normalizedLabelText || "WL");
 
-  useEffect(() => {
-    setSourceIndex(sources.length > 0 ? 0 : -1);
-  }, [sources]);
+  const advanceSource = (currentSource: string | null) => {
+    if (!currentSource) {
+      return;
+    }
 
-  const advanceSource = () => {
-    setSourceIndex((currentIndex) => {
-      if (currentIndex < 0) {
-        return -1;
+    setFailedSources((current) => {
+      if (current[currentSource]) {
+        return current;
       }
 
-      const nextIndex = currentIndex + 1;
-      return nextIndex < sources.length ? nextIndex : -1;
+      return {
+        ...current,
+        [currentSource]: true,
+      };
     });
   };
 
@@ -105,12 +107,12 @@ export function WalletBrandLogo({
           referrerPolicy="no-referrer"
           data-source-index="0"
           className="relative z-10 h-6 w-auto max-w-[4.75rem] object-contain"
-          onError={advanceSource}
+          onError={() => advanceSource(source)}
           onLoad={(event) => {
             const image = event.currentTarget;
             // Some placeholder files resolve to an image element with zero dimensions.
             if (image.naturalWidth === 0 || image.naturalHeight === 0) {
-              advanceSource();
+              advanceSource(source);
             }
           }}
         />
