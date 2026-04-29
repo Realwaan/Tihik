@@ -22,6 +22,7 @@ import MuiSkeleton from "@mui/material/Skeleton";
 import { AccountOverviewCardTransactionsModal } from "@/components/account-overview/account-overview-card-transactions-modal";
 import { isTransactionLinkedToAccount } from "@/components/account-overview/account-overview-utils";
 import { MobileNavDock } from "@/components/mobile-nav-dock";
+import { SignOutButton } from "@/components/auth-buttons";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -30,7 +31,6 @@ import { WalletCategoryBadge } from "@/components/ui/wallet-category-badge";
 import { getAccountCardTheme } from "@/lib/account-card-theme";
 import { isCreditCardLikeAccount } from "@/lib/bank-account-eligibility";
 import { getWalletBadge } from "@/lib/wallet-badges";
-import { UserButton } from "@clerk/nextjs";
 
 type DashboardData = {
   totalIncome: number;
@@ -865,14 +865,7 @@ export function DashboardDashboard() {
             </div>
             <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1 sm:w-auto sm:justify-start sm:gap-3">
               <ThemeToggle />
-              <UserButton
-                appearance={{
-                  elements: {
-                    avatarBox:
-                      "h-10 w-10 ring-1 ring-slate-300/80 dark:ring-slate-700/80 shadow-sm",
-                  },
-                }}
-              />
+              <SignOutButton />
             </div>
           </div>
         </div>

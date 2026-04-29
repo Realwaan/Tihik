@@ -7,8 +7,8 @@ export default async function ProfileRoute() {
   const session = await auth();
 
   if (!session) {
-    redirect("/");
+    redirect("/signin?callbackUrl=/profile");
   }
 
-  return <ProfilePage />;
+  return <ProfilePage name={session.user?.name} email={session.user?.email} />;
 }

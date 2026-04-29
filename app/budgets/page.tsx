@@ -8,7 +8,7 @@ export default async function BudgetsPage() {
   const session = await auth();
 
   if (!session) {
-    redirect("/");
+    redirect("/signin?callbackUrl=/budgets");
   }
 
   return (

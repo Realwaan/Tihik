@@ -9,7 +9,7 @@ export default async function PlanPage() {
   const session = await auth();
 
   if (!session) {
-    redirect("/");
+    redirect("/signin?callbackUrl=/plan");
   }
 
   const now = new Date();

@@ -158,7 +158,7 @@ export function CollaborationManager() {
     sessionRedirectingRef.current = true;
     await signOut({ redirect: false });
     showToast("error", "Session expired after database reset. Please sign in again.");
-    router.replace("/signin");
+    router.replace("/signin?callbackUrl=/collaboration");
   }
 
   async function loadHouseholds() {

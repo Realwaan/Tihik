@@ -8,7 +8,7 @@ export default async function CollaborationPage() {
   const session = await auth();
 
   if (!session) {
-    redirect("/");
+    redirect("/signin?callbackUrl=/collaboration");
   }
 
   return (

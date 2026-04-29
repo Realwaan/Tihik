@@ -8,7 +8,7 @@ export default async function TransactionsPage() {
   const session = await auth();
 
   if (!session) {
-    redirect("/");
+    redirect("/signin?callbackUrl=/transactions");
   }
 
   return (
