@@ -90,7 +90,7 @@ export async function callNvidiaNemotron(
   message: string
 ): Promise<ProviderResult> {
   const model =
-    process.env.NVIDIA_MODEL?.trim() || "nvidia/nemotron-3-super-120b-a12b";
+    process.env.NVIDIA_MODEL?.trim() || "nvidia/llama-3.3-nemotron-super-49b-v1.5";
   const baseUrl =
     process.env.NVIDIA_BASE_URL?.trim() || "https://integrate.api.nvidia.com/v1";
   const temperature = getEnvNumber("NVIDIA_TEMPERATURE", 1);
