@@ -36,11 +36,11 @@ export function TrackItLanding() {
             <p className="text-sm font-semibold uppercase tracking-[0.35em] text-amber-300">TrackIt</p>
             <p className="text-xs text-slate-300 sm:text-sm">Expense tracking for focused teams and solo users</p>
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-3">
-            <Link href="/signup" className="hover-rise rounded-full border border-white/10 px-4 py-3 text-center text-sm font-medium text-white transition hover:bg-white/10 sm:py-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <Link href="/signup" className="hover-rise inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-full border border-white/10 px-4 py-2.5 text-center text-sm font-medium text-white transition hover:bg-white/10 sm:min-h-10 sm:w-auto sm:py-2">
               Sign Up
             </Link>
-            <Link href="/dashboard" className="hover-rise rounded-full border border-white/10 px-4 py-3 text-center text-sm font-medium text-white transition hover:bg-white/10 sm:py-2">
+            <Link href="/dashboard" className="hover-rise inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-full border border-white/10 px-4 py-2.5 text-center text-sm font-medium text-white transition hover:bg-white/10 sm:min-h-10 sm:w-auto sm:py-2">
               Dashboard
             </Link>
             <SignInButton />
@@ -53,7 +53,7 @@ export function TrackItLanding() {
               <span className="h-2 w-2 rounded-full bg-amber-300" />
               Built for fast monthly review
             </p>
-            <h1 className="mt-5 text-4xl font-semibold tracking-tight text-white sm:mt-6 sm:text-5xl md:text-7xl">
+            <h1 className="mt-5 text-[2.15rem] font-semibold leading-[1.04] tracking-tight text-white min-[390px]:text-4xl sm:mt-6 sm:text-5xl md:text-7xl">
               Track spending without losing the signal.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-slate-300 sm:mt-6 sm:text-lg sm:leading-8">
@@ -75,7 +75,7 @@ export function TrackItLanding() {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                 <div>
                   <p className="text-sm text-slate-400">Current balance</p>
-                  <p className="mt-2 text-3xl font-semibold text-white sm:text-4xl">$12,480.22</p>
+                  <p className="mt-2 text-[2rem] font-semibold leading-tight tracking-tight text-white min-[390px]:text-3xl sm:text-4xl">$12,480.22</p>
                 </div>
                 <div className="inline-flex w-fit rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300">
                   +12.4% this month
