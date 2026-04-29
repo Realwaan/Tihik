@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { buildBrandfetchLogoProxySource } from "@/lib/brandfetch-logo";
 import type { WalletBadge } from "@/lib/wallet-badges";
@@ -42,21 +42,23 @@ export function WalletLogoDot({
   imageClassName = "absolute inset-[1px] h-[calc(100%-2px)] w-[calc(100%-2px)] rounded-full object-contain",
 }: WalletLogoDotProps) {
   const sources = useMemo(() => buildLogoSources(badge), [badge]);
-  const [sourceIndex, setSourceIndex] = useState(() => (sources.length > 0 ? 0 : -1));
-  const source = sourceIndex >= 0 ? sources[sourceIndex] : null;
+  const [failedSources, setFailedSources] = useState<Record<string, true>>({});
+  const source = sources.find((candidate) => !failedSources[candidate]) ?? null;
 
-  useEffect(() => {
-    setSourceIndex(sources.length > 0 ? 0 : -1);
-  }, [sources]);
+  const advanceSource = (currentSource: string | null) => {
+    if (!currentSource) {
+      return;
+    }
 
-  const advanceSource = () => {
-    setSourceIndex((currentIndex) => {
-      if (currentIndex < 0) {
-        return -1;
+    setFailedSources((current) => {
+      if (current[currentSource]) {
+        return current;
       }
 
-      const nextIndex = currentIndex + 1;
-      return nextIndex < sources.length ? nextIndex : -1;
+      return {
+        ...current,
+        [currentSource]: true,
+      };
     });
   };
 
@@ -75,11 +77,11 @@ export function WalletLogoDot({
           referrerPolicy="no-referrer"
           data-source-index="0"
           className={imageClassName}
-          onError={advanceSource}
+          onError={() => advanceSource(source)}
           onLoad={(event) => {
             const image = event.currentTarget;
             if (image.naturalWidth === 0 || image.naturalHeight === 0) {
-              advanceSource();
+              advanceSource(source);
             }
           }}
         />

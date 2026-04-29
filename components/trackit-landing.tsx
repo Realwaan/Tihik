@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, BadgeCheck, BarChart3, ShieldCheck, WalletCards } from "lucide-react";
 
 import { SignInButton } from "@/components/auth-buttons";
+import { InstallAppButton } from "@/components/install-app-button";
 
 const features = [
   {
@@ -43,6 +44,7 @@ export function TrackItLanding() {
             <Link href="/dashboard" className="hover-rise inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-full border border-white/10 px-4 py-2.5 text-center text-sm font-medium text-white transition hover:bg-white/10 sm:min-h-10 sm:w-auto sm:py-2">
               Dashboard
             </Link>
+            <InstallAppButton compactLabel />
             <SignInButton />
           </div>
         </header>
@@ -67,6 +69,7 @@ export function TrackItLanding() {
               <Link href="/transactions" className="hover-rise inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 sm:w-auto">
                 Manage transactions
               </Link>
+              <InstallAppButton className="border-white/20 bg-white/10 text-white hover:bg-white/15" />
             </div>
           </div>
 
