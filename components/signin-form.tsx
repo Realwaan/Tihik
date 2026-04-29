@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { ArrowRight, Lock, Mail } from "lucide-react";
+import { ArrowRight, Lock, Mail, Globe } from "lucide-react";
 
 import { useToast } from "@/components/toast-provider";
 
@@ -20,12 +20,25 @@ export function SignInForm() {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const callbackUrl = useMemo(
     () => getCallbackUrl(searchParams.get("callbackUrl")),
     [searchParams]
   );
   const verifyEmail = searchParams.get("verifyEmail");
+
+  async function handleGoogleSignIn() {
+    setGoogleLoading(true);
+    try {
+      await signIn("google", { redirect: true, callbackUrl });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Google sign-in failed";
+      setError(message);
+      showToast("error", message);
+      setGoogleLoading(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -134,12 +147,31 @@ export function SignInForm() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || googleLoading}
             className="group relative w-full cursor-pointer overflow-hidden rounded-lg bg-blue-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/50 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
           >
             <span className="flex items-center justify-center gap-2">
               {loading ? "Signing in..." : <>Sign in <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" /></>}
             </span>
+          </button>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-300 dark:border-slate-700" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="bg-white px-2 text-slate-600 dark:bg-slate-900/95 dark:text-slate-400">Or continue with</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={loading || googleLoading}
+            className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-500/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+          >
+            <Globe className="h-5 w-5" />
+            {googleLoading ? "Signing in..." : "Google"}
           </button>
         </form>
 
