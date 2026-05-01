@@ -34,33 +34,45 @@ export function buildLocalFallbackReply(
       "Focus: collaboration. Check shared household expense totals and settlement suggestions.";
   }
 
-  const getLine = (label: string) =>
-    snapshotInstruction
-      .split("\n")
-      .find((line) => line.startsWith(`${label}:`))
-      ?.replace(`${label}: `, "") ?? "N/A";
+  const lines = snapshotInstruction
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
 
-  const preferredCurrency = getLine("Preferred currency");
-  const balance = getLine("Dashboard current balance");
-  const income = getLine("Current month income");
-  const expense = getLine("Current month expense");
-  const topCategories = getLine("Top expense categories this month");
-  const budgetAlerts = getLine("Dashboard budget alerts");
-  const recurringDue = getLine("Recurring runs due in next 30 days");
-  const shared = getLine("Shared household expenses this month");
+  const getLine = (label: string) => {
+    const line = lines.find((entry) => entry.startsWith(`${label}:`));
+    if (!line) {
+      return null;
+    }
+
+    const value = line.slice(label.length + 1).trim();
+    return value.length > 0 ? value : null;
+  };
+
+  const snapshotRows = [
+    ["Preferred currency", getLine("Preferred currency")],
+    ["Current balance", getLine("Dashboard current balance")],
+    ["Income this month", getLine("Current month income")],
+    ["Expenses this month", getLine("Current month expense")],
+    ["Top expense categories", getLine("Top expense categories this month")],
+    ["Budget alerts", getLine("Dashboard budget alerts")],
+    ["Shared expenses", getLine("Shared household expenses this month")],
+    ["Recurring due (30d)", getLine("Recurring runs due in next 30 days")],
+  ].filter(([, value]) => value !== null) as Array<[string, string]>;
+
+  const hasSnapshotData = snapshotRows.length > 0;
+
+  if (!hasSnapshotData) {
+    lead += " I could not load account snapshot data for this response.";
+  }
 
   return [
     lead,
     "",
     "Snapshot",
-    `- Preferred currency: ${preferredCurrency}`,
-    `- Current balance: ${balance}`,
-    `- Income this month: ${income}`,
-    `- Expenses this month: ${expense}`,
-    `- Top expense categories: ${topCategories}`,
-    `- Budget alerts: ${budgetAlerts}`,
-    `- Shared expenses: ${shared}`,
-    `- Recurring due (30d): ${recurringDue}`,
+    ...(hasSnapshotData
+      ? snapshotRows.map(([label, value]) => `- ${label}: ${value}`)
+      : ["- No dashboard data available yet. Add transactions or sign in to load your snapshot." ]),
     "",
     "Insights",
     hint,
