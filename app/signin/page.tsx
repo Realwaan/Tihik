@@ -1,11 +1,15 @@
 "use client";
 
 import { SignInForm } from "@/components/signin-form";
+import { AuthShell } from "@/components/layout/auth-shell";
 
 export default function SignInPage() {
   return (
-    <main className="page-shell auth-surface flex min-h-screen items-center justify-center px-4 py-6 sm:py-12">
+    <AuthShell
+      title="Get back to your money flow"
+      description="Track spending trends, recurring bills, and collaboration updates in one focused workspace."
+    >
       <SignInForm />
-    </main>
+    </AuthShell>
   );
 }

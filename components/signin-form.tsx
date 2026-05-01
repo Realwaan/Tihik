@@ -4,9 +4,13 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { ArrowRight, Lock, Mail, Globe } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, Sparkles } from "lucide-react";
 
 import { useToast } from "@/components/toast-provider";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function getCallbackUrl(value: string | null) {
   if (!value) return "/dashboard";
@@ -21,6 +25,7 @@ export function SignInForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const callbackUrl = useMemo(
     () => getCallbackUrl(searchParams.get("callbackUrl")),
@@ -81,112 +86,148 @@ export function SignInForm() {
   }
 
   return (
-    <div className="w-full max-w-md px-1 sm:px-0">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/95 sm:p-8">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">Welcome back</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            Sign in to continue to TrackIt
-          </p>
-        </div>
-
-        {verifyEmail ? (
-          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-900/30">
-            <p className="text-sm font-medium text-emerald-900 dark:text-emerald-300">
-              Account created for {verifyEmail}. Use the email and password you registered with.
-            </p>
-          </div>
-        ) : null}
-
-        {error ? (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/30">
-            <p className="text-sm font-medium text-red-900 dark:text-red-300">{error}</p>
-          </div>
-        ) : null}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-medium text-slate-900 dark:text-slate-200">
-              Email Address
-            </label>
-            <div className="relative">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                <Mail className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-              </div>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                required
-                disabled={loading}
-                placeholder="you@example.com"
-                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
-              />
+    <div className="w-full max-w-xl px-1 sm:px-0">
+      <Card className="overflow-hidden border-slate-200/90 bg-white/95 shadow-xl dark:border-slate-700/80 dark:bg-slate-900/95">
+        <CardHeader className="relative overflow-hidden border-b border-slate-200/70 pb-6 dark:border-slate-800/70">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.18),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(250,204,21,0.16),transparent_40%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.2),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(250,204,21,0.14),transparent_40%)]" />
+          <div className="relative flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">TrackIt access</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Welcome back</h1>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Sign in to continue to your dashboard.</p>
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-medium text-slate-900 dark:text-slate-200">
-              Password
-            </label>
-            <div className="relative">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                <Lock className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-              </div>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                required
-                disabled={loading}
-                placeholder="••••••••"
-                className="block w-full rounded-lg border border-slate-300 bg-white py-3 pl-11 pr-4 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500 dark:disabled:bg-slate-800 dark:disabled:text-slate-400"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || googleLoading}
-            className="group relative w-full cursor-pointer overflow-hidden rounded-lg bg-blue-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500/50 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
-          >
-            <span className="flex items-center justify-center gap-2">
-              {loading ? "Signing in..." : <>Sign in <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" /></>}
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white/85 text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200">
+              <Sparkles className="h-5 w-5" />
             </span>
-          </button>
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-300 dark:border-slate-700" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-2 text-slate-600 dark:bg-slate-900/95 dark:text-slate-400">Or continue with</span>
-            </div>
           </div>
+        </CardHeader>
 
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={loading || googleLoading}
-            className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-500/10 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
-          >
-            <Globe className="h-5 w-5" />
-            {googleLoading ? "Signing in..." : "Google"}
-          </button>
-        </form>
+        <CardContent className="pt-6">
+          {verifyEmail ? (
+            <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 dark:border-emerald-800/70 dark:bg-emerald-900/25">
+              <p className="text-sm font-medium text-emerald-900 dark:text-emerald-300">
+                Account created for {verifyEmail}. Use the same credentials to sign in.
+              </p>
+            </div>
+          ) : null}
 
-        <div className="mt-6 flex flex-col items-center gap-3 text-center">
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Don’t have an account?{" "}
-            <Link href="/signup" className="font-semibold text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-              Sign up
+          {error ? (
+            <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-3.5 dark:border-rose-800/70 dark:bg-rose-900/25">
+              <p className="text-sm font-medium text-rose-900 dark:text-rose-300">{error}</p>
+            </div>
+          ) : null}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-slate-800 dark:text-slate-200">Email</Label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  disabled={loading || googleLoading}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  className="h-11 rounded-xl pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-slate-800 dark:text-slate-200">Password</Label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  disabled={loading || googleLoading}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  className="h-11 rounded-xl px-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                </button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={loading || googleLoading}
+              className="mt-1 h-11 w-full rounded-xl bg-blue-600 text-base font-semibold text-white hover:bg-blue-700"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  Sign in
+                  <ArrowRight className="h-4.5 w-4.5" />
+                </>
+              )}
+            </Button>
+
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200 dark:border-slate-700" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-white px-2 text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:bg-slate-900/95 dark:text-slate-400">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGoogleSignIn}
+              disabled={loading || googleLoading}
+              className="h-11 w-full rounded-xl border-slate-300 text-base font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
+            >
+              {googleLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden="true">
+                    <path
+                      d="M21.35 11.1H12v2.98h5.36c-.23 1.48-1.83 4.34-5.36 4.34-3.23 0-5.86-2.67-5.86-5.95s2.63-5.95 5.86-5.95c1.84 0 3.08.79 3.78 1.46l2.58-2.49C16.72 3.99 14.57 3 12 3 7.03 3 3 7.03 3 12s4.03 9 9 9c5.2 0 8.65-3.65 8.65-8.79 0-.59-.06-1.04-.14-1.11Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  Google
+                </>
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-6 flex items-center justify-between gap-3 border-t border-slate-200 pt-4 text-sm dark:border-slate-800">
+            <p className="text-slate-600 dark:text-slate-400">
+              Need an account?{" "}
+              <Link href="/signup" className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                Sign up
+              </Link>
+            </p>
+            <Link href="/" className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+              Back to home
             </Link>
-          </p>
-          <Link href="/" className="text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-            Back to home
-          </Link>
-        </div>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
