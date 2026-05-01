@@ -121,7 +121,7 @@ export function SignInForm() {
             <div className="space-y-2">
               <Label htmlFor="email" className="text-slate-800 dark:text-slate-200">Email</Label>
               <div className="relative">
-                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <Input
                   id="email"
                   name="email"
@@ -138,7 +138,7 @@ export function SignInForm() {
             <div className="space-y-2">
               <Label htmlFor="password" className="text-slate-800 dark:text-slate-200">Password</Label>
               <div className="relative">
-                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <Input
                   id="password"
                   name="password"
@@ -155,7 +155,7 @@ export function SignInForm() {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                  {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
                 </button>
               </div>
             </div>
@@ -173,7 +173,7 @@ export function SignInForm() {
               ) : (
                 <>
                   Sign in
-                  <ArrowRight className="h-4.5 w-4.5" />
+                  <ArrowRight className="h-[18px] w-[18px]" />
                 </>
               )}
             </Button>
@@ -203,7 +203,7 @@ export function SignInForm() {
                 </>
               ) : (
                 <>
-                  <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 flex-shrink-0" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] flex-shrink-0" aria-hidden="true">
                     <path
                       d="M21.35 11.1H12v2.98h5.36c-.23 1.48-1.83 4.34-5.36 4.34-3.23 0-5.86-2.67-5.86-5.95s2.63-5.95 5.86-5.95c1.84 0 3.08.79 3.78 1.46l2.58-2.49C16.72 3.99 14.57 3 12 3 7.03 3 3 7.03 3 12s4.03 9 9 9c5.2 0 8.65-3.65 8.65-8.79 0-.59-.06-1.04-.14-1.11Z"
                       fill="currentColor"
