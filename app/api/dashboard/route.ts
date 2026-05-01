@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { convertToUSD } from "@/lib/currency";
@@ -12,6 +12,11 @@ const TRANSACTION_TYPE = {
 } as const;
 
 const TRANSFER_CATEGORY = "Transfer";
+type SummaryPeriod = "THIS_MONTH" | "LAST_30_DAYS" | "ALL_TIME";
+type DateFilter = {
+  gte?: Date;
+  lt?: Date;
+};
 
 async function safeQuery<T>(label: string, query: Promise<T>, fallback: T): Promise<T> {
   try {
@@ -22,7 +27,7 @@ async function safeQuery<T>(label: string, query: Promise<T>, fallback: T): Prom
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
 
@@ -31,6 +36,10 @@ export async function GET() {
     }
 
     const now = new Date();
+    const summaryPeriod = parseSummaryPeriod(
+      request.nextUrl.searchParams.get("summaryPeriod")
+    );
+    const summaryRange = getSummaryRange(summaryPeriod, now);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
@@ -41,10 +50,11 @@ export async function GET() {
           where: {
             userId: session.user.id,
             type: TRANSACTION_TYPE.INCOME,
-            date: {
-              gte: monthStart,
-              lt: nextMonthStart,
-            },
+            ...(summaryRange.currentDateFilter
+              ? {
+                  date: summaryRange.currentDateFilter,
+                }
+              : {}),
           },
           _sum: {
             amount: true,
@@ -61,10 +71,11 @@ export async function GET() {
             category: {
               not: TRANSFER_CATEGORY,
             },
-            date: {
-              gte: monthStart,
-              lt: nextMonthStart,
-            },
+            ...(summaryRange.currentDateFilter
+              ? {
+                  date: summaryRange.currentDateFilter,
+                }
+              : {}),
           },
           _sum: {
             amount: true,
@@ -105,6 +116,44 @@ export async function GET() {
       ),
     ]);
 
+    const [incomePreviousAgg, expensePreviousAgg] = await Promise.all([
+      summaryRange.previousDateFilter
+        ? safeQuery(
+            "previous income aggregate",
+            prisma.transaction.aggregate({
+              where: {
+                userId: session.user.id,
+                type: TRANSACTION_TYPE.INCOME,
+                date: summaryRange.previousDateFilter,
+              },
+              _sum: {
+                amount: true,
+              },
+            }),
+            { _sum: { amount: 0 } }
+          )
+        : Promise.resolve({ _sum: { amount: 0 } }),
+      summaryRange.previousDateFilter
+        ? safeQuery(
+            "previous expense aggregate",
+            prisma.transaction.aggregate({
+              where: {
+                userId: session.user.id,
+                type: TRANSACTION_TYPE.EXPENSE,
+                category: {
+                  not: TRANSFER_CATEGORY,
+                },
+                date: summaryRange.previousDateFilter,
+              },
+              _sum: {
+                amount: true,
+              },
+            }),
+            { _sum: { amount: 0 } }
+          )
+        : Promise.resolve({ _sum: { amount: 0 } }),
+    ]);
+
     const walletRows = await safeQuery(
       "wallet rows",
       prisma.transaction.findMany({
@@ -125,6 +174,9 @@ export async function GET() {
     const totalIncome = incomeAgg._sum.amount ?? 0;
     const totalExpenses = expenseAgg._sum.amount ?? 0;
     const currentBalance = totalIncome - totalExpenses;
+    const previousIncome = incomePreviousAgg._sum.amount ?? 0;
+    const previousExpenses = expensePreviousAgg._sum.amount ?? 0;
+    const previousBalance = previousIncome - previousExpenses;
     const totalsByCurrency = await safeQuery(
       "totals by currency",
       prisma.transaction.groupBy({
@@ -439,6 +491,14 @@ export async function GET() {
           totalIncome,
           totalExpenses,
           currentBalance,
+          summaryPeriod,
+          summaryLabel: summaryRange.label,
+          previousSummaryLabel: summaryRange.previousLabel,
+          summaryComparison: {
+            cashflowChangePercent: computePercentChange(currentBalance, previousBalance),
+            incomeChangePercent: computePercentChange(totalIncome, previousIncome),
+            expenseChangePercent: computePercentChange(totalExpenses, previousExpenses),
+          },
           expensesByCategory,
           budgetSummary,
           overBudgetCount,
@@ -471,6 +531,75 @@ export async function GET() {
       { status: 500 }
     );
   }
+}
+
+function parseSummaryPeriod(value: string | null): SummaryPeriod {
+  if (value === "THIS_MONTH" || value === "LAST_30_DAYS" || value === "ALL_TIME") {
+    return value;
+  }
+  return "ALL_TIME";
+}
+
+function getSummaryRange(period: SummaryPeriod, now: Date): {
+  currentDateFilter: DateFilter | null;
+  previousDateFilter: DateFilter | null;
+  label: string;
+  previousLabel: string | null;
+} {
+  if (period === "ALL_TIME") {
+    return {
+      currentDateFilter: null,
+      previousDateFilter: null,
+      label: "All time",
+      previousLabel: null,
+    };
+  }
+
+  if (period === "THIS_MONTH") {
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return {
+      currentDateFilter: {
+        gte: monthStart,
+        lt: nextMonthStart,
+      },
+      previousDateFilter: {
+        gte: prevMonthStart,
+        lt: monthStart,
+      },
+      label: "This month",
+      previousLabel: "Previous month",
+    };
+  }
+
+  const endExclusive = new Date(now);
+  endExclusive.setHours(23, 59, 59, 999);
+  const start = new Date(endExclusive);
+  start.setDate(start.getDate() - 29);
+  start.setHours(0, 0, 0, 0);
+  const previousStart = new Date(start);
+  previousStart.setDate(previousStart.getDate() - 30);
+
+  return {
+    currentDateFilter: {
+      gte: start,
+      lt: endExclusive,
+    },
+    previousDateFilter: {
+      gte: previousStart,
+      lt: start,
+    },
+    label: "Last 30 days",
+    previousLabel: "Previous 30 days",
+  };
+}
+
+function computePercentChange(current: number, previous: number) {
+  if (previous === 0) {
+    return null;
+  }
+  return ((current - previous) / Math.abs(previous)) * 100;
 }
 
 function estimateMonthlyRecurringAmount(

@@ -36,6 +36,14 @@ type DashboardData = {
   totalIncome: number;
   totalExpenses: number;
   currentBalance: number;
+  summaryPeriod?: "THIS_MONTH" | "LAST_30_DAYS" | "ALL_TIME";
+  summaryLabel?: string;
+  previousSummaryLabel?: string | null;
+  summaryComparison?: {
+    cashflowChangePercent: number | null;
+    incomeChangePercent: number | null;
+    expenseChangePercent: number | null;
+  };
   expensesByCategory: Array<{
     category: string;
     amount: number;
@@ -95,6 +103,7 @@ type DashboardData = {
 };
 
 type Currency = "USD" | "EUR" | "GBP" | "JPY" | "CAD" | "AUD" | "PHP";
+type SummaryPeriod = "THIS_MONTH" | "LAST_30_DAYS" | "ALL_TIME";
 type NotificationItem = {
   id: string;
   type:
@@ -136,6 +145,7 @@ type AccountTransaction = {
 const palette = ["#f59e0b", "#3b82f6", "#8b5cf6", "#14b8a6", "#ef4444", "#22c55e"];
 const READ_NOTIFICATIONS_STORAGE_KEY = "trackit.notifications.read.v1";
 const ACCOUNT_ORDER_STORAGE_KEY = "trackit.dashboard.account-order.v1";
+const SUMMARY_PERIOD_STORAGE_KEY = "trackit.dashboard.summary-period.v1";
 
 function toPseudoCardNumber(seed: string) {
   const digits = Array.from(seed).map((char) => char.charCodeAt(0) % 10);
@@ -188,6 +198,8 @@ export function DashboardDashboard() {
   const [loadingAccountTransactions, setLoadingAccountTransactions] = useState(false);
   const [accountTransactionsError, setAccountTransactionsError] = useState<string | null>(null);
   const [previousDebitNetWorth, setPreviousDebitNetWorth] = useState<number | null>(null);
+  const [summaryPeriod, setSummaryPeriod] = useState<SummaryPeriod>("ALL_TIME");
+  const [dashboardRefreshNonce, setDashboardRefreshNonce] = useState(0);
   const notificationsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -196,7 +208,7 @@ export function DashboardDashboard() {
     async function loadDashboard() {
       try {
         setLoading(true);
-        const response = await fetch("/api/dashboard", {
+        const response = await fetch(`/api/dashboard?summaryPeriod=${summaryPeriod}`, {
           signal: controller.signal,
         });
 
@@ -263,7 +275,27 @@ export function DashboardDashboard() {
     loadPreference();
     loadPreviousDayNetWorth();
     return () => controller.abort();
+  }, [dashboardRefreshNonce, summaryPeriod]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(SUMMARY_PERIOD_STORAGE_KEY);
+      if (!raw) return;
+      if (raw === "THIS_MONTH" || raw === "LAST_30_DAYS" || raw === "ALL_TIME") {
+        setSummaryPeriod(raw);
+      }
+    } catch {
+      // ignore invalid local storage values
+    }
   }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SUMMARY_PERIOD_STORAGE_KEY, summaryPeriod);
+    } catch {
+      // ignore storage write failures
+    }
+  }, [summaryPeriod]);
 
   useEffect(() => {
     try {
@@ -980,9 +1012,71 @@ export function DashboardDashboard() {
         ) : (
           <>
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <MetricCard label="Net cashflow" value={formatCurrency(data?.currentBalance ?? 0, preferredCurrency)} icon={Wallet} accent="amber" />
-              <MetricCard label="Total income" value={formatCurrency(data?.totalIncome ?? 0, preferredCurrency)} icon={ArrowUpRight} accent="emerald" />
-              <MetricCard label="Total expenses" value={formatCurrency(data?.totalExpenses ?? 0, preferredCurrency)} icon={PieChart} accent="rose" />
+              <div className="sm:col-span-2 xl:col-span-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900 sm:px-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Summary period</p>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      {data?.summaryLabel ?? "All time"}
+                      {data?.previousSummaryLabel ? ` vs ${data.previousSummaryLabel.toLowerCase()}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { key: "THIS_MONTH", label: "This month" },
+                      { key: "LAST_30_DAYS", label: "Last 30 days" },
+                      { key: "ALL_TIME", label: "All time" },
+                    ] as const).map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => setSummaryPeriod(option.key)}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                          summaryPeriod === option.key
+                            ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-600 dark:bg-blue-950/40 dark:text-blue-300"
+                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDashboardRefreshNonce((value) => value + 1)}
+                      className="rounded-full"
+                    >
+                      <RefreshCcw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                      Refresh
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <MetricCard
+                label="Net cashflow"
+                value={formatCurrency(data?.currentBalance ?? 0, preferredCurrency)}
+                icon={Wallet}
+                accent="amber"
+                changePercent={data?.summaryComparison?.cashflowChangePercent ?? null}
+                comparisonLabel={data?.previousSummaryLabel ?? null}
+              />
+              <MetricCard
+                label="Total income"
+                value={formatCurrency(data?.totalIncome ?? 0, preferredCurrency)}
+                icon={ArrowUpRight}
+                accent="emerald"
+                changePercent={data?.summaryComparison?.incomeChangePercent ?? null}
+                comparisonLabel={data?.previousSummaryLabel ?? null}
+              />
+              <MetricCard
+                label="Total expenses"
+                value={formatCurrency(data?.totalExpenses ?? 0, preferredCurrency)}
+                icon={PieChart}
+                accent="rose"
+                changePercent={data?.summaryComparison?.expenseChangePercent ?? null}
+                comparisonLabel={data?.previousSummaryLabel ?? null}
+              />
             </section>
 
             <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40 sm:p-6">
@@ -1594,17 +1688,33 @@ function MetricCard({
   value,
   icon: Icon,
   accent,
+  changePercent,
+  comparisonLabel,
 }: {
   label: string;
   value: string;
   icon: ComponentType<{ className?: string }>;
   accent: "amber" | "emerald" | "rose";
+  changePercent?: number | null;
+  comparisonLabel?: string | null;
 }) {
   const accentStyles = {
     amber: "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
     emerald: "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800",
     rose: "bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-800",
   }[accent];
+
+  const changeTone =
+    changePercent == null
+      ? "text-slate-500 dark:text-slate-400"
+      : changePercent >= 0
+        ? "text-emerald-700 dark:text-emerald-300"
+        : "text-rose-700 dark:text-rose-300";
+
+  const formattedChange =
+    changePercent == null
+      ? "N/A"
+      : `${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(1)}%`;
 
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/40 sm:p-6">
@@ -1615,6 +1725,10 @@ function MetricCard({
         </span>
       </div>
       <p className="mt-6 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">{value}</p>
+      <p className={`mt-2 text-xs font-medium ${changeTone}`}>
+        {formattedChange}
+        {comparisonLabel ? ` vs ${comparisonLabel.toLowerCase()}` : ""}
+      </p>
     </article>
   );
 }

@@ -9,10 +9,11 @@ import { PwaRegister } from "@/components/pwa-register";
 import { KeyboardFocusAssist } from "@/components/keyboard-focus-assist";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { auth } from "@/auth";
-import { SignInButton, SignOutButton, SignUpButton } from "@/components/auth-buttons";
+import { SignInButton, SignUpButton } from "@/components/auth-buttons";
 import { ClerkTopBarVisibility } from "@/components/layout/clerk-top-bar-visibility";
 import { InstallAppButton } from "@/components/install-app-button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ProfilePopupForm } from "@/components/profile-popup-form";
 
 export const viewport = {
   width: "device-width",
@@ -76,7 +77,10 @@ export default async function RootLayout({
                     <ThemeToggle />
 
                     {isAuthenticated ? (
-                      <SignOutButton />
+                      <ProfilePopupForm
+                        initialName={session?.user?.name}
+                        initialEmail={session?.user?.email}
+                      />
                     ) : (
                       <>
                         <SignInButton />

@@ -1,9 +1,13 @@
 import { SignupForm } from "@/components/signup-form";
+import { AuthShell } from "@/components/layout/auth-shell";
 
 export default function SignupPage() {
   return (
-    <div className="page-shell auth-surface flex min-h-screen items-center justify-center px-4 py-6 sm:py-12">
+    <AuthShell
+      title="Start your smarter budget journey"
+      description="Create your account to unlock automatic categorization, collaboration, and real-time budget visibility."
+    >
       <SignupForm />
-    </div>
+    </AuthShell>
   );
 }
