@@ -1705,14 +1705,14 @@ function MetricCard({
   }[accent];
 
   const changeTone =
-    changePercent === null
+    changePercent == null
       ? "text-slate-500 dark:text-slate-400"
       : changePercent >= 0
         ? "text-emerald-700 dark:text-emerald-300"
         : "text-rose-700 dark:text-rose-300";
 
   const formattedChange =
-    changePercent === null
+    changePercent == null
       ? "N/A"
       : `${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(1)}%`;
 
