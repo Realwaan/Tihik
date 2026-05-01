@@ -203,7 +203,7 @@ export function SignInForm() {
                 </>
               ) : (
                 <>
-                  <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" className="h-4.5 w-4.5 flex-shrink-0" aria-hidden="true">
                     <path
                       d="M21.35 11.1H12v2.98h5.36c-.23 1.48-1.83 4.34-5.36 4.34-3.23 0-5.86-2.67-5.86-5.95s2.63-5.95 5.86-5.95c1.84 0 3.08.79 3.78 1.46l2.58-2.49C16.72 3.99 14.57 3 12 3 7.03 3 3 7.03 3 12s4.03 9 9 9c5.2 0 8.65-3.65 8.65-8.79 0-.59-.06-1.04-.14-1.11Z"
                       fill="currentColor"

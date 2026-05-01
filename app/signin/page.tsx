@@ -1,5 +1,3 @@
-"use client";
-
 import { SignInForm } from "@/components/signin-form";
 import { AuthShell } from "@/components/layout/auth-shell";
 
