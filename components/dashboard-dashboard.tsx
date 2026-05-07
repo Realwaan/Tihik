@@ -2,6 +2,7 @@
 
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { ArrowUpRight, PieChart, RefreshCcw, Wallet, Target, Users, Bell, Landmark, Smartphone, CreditCard, MoreHorizontal, CheckCheck, CircleAlert, Info } from "lucide-react";
 import {
   Bar,
@@ -22,7 +23,6 @@ import { AccountOverviewCardTransactionsModal } from "@/components/account-overv
 import { isTransactionLinkedToAccount } from "@/components/account-overview/account-overview-utils";
 import { MobileNavDock } from "@/components/mobile-nav-dock";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { WalletBrandLogo } from "@/components/ui/wallet-brand-logo";
 import { WalletCategoryBadge } from "@/components/ui/wallet-category-badge";
@@ -648,30 +648,34 @@ export function DashboardDashboard() {
             <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">Dashboard</h1>
           </div>
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-3">
-            <a href="/transactions" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full justify-center border-slate-300/70 bg-white/70 text-slate-700 shadow-none hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 sm:w-auto">
-                <RefreshCcw className="h-4 w-4" />
-                Transactions
-              </Button>
-            </a>
-            <a href="/budgets" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full justify-center border-slate-300/70 bg-white/70 text-slate-700 shadow-none hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 sm:w-auto">
-                <Target className="h-4 w-4" />
-                Budgets
-              </Button>
-            </a>
-            <a href="/plan" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full justify-center border-slate-300/70 bg-white/70 text-slate-700 shadow-none hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 sm:w-auto">
-                <CreditCard className="h-4 w-4" />
-                Plan
-              </Button>
-            </a>
-            <a href="/collaboration" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full justify-center border-slate-300/70 bg-white/70 text-slate-700 shadow-none hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 sm:w-auto">
-                <Users className="h-4 w-4" />
-                Collaboration
-              </Button>
-            </a>
+            <Link
+              href="/transactions"
+              className="hover-rise inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-slate-300/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-none transition-all duration-200 ease-out hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 motion-reduce:transition-none sm:w-auto"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Transactions
+            </Link>
+            <Link
+              href="/budgets"
+              className="hover-rise inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-slate-300/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-none transition-all duration-200 ease-out hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 motion-reduce:transition-none sm:w-auto"
+            >
+              <Target className="h-4 w-4" />
+              Budgets
+            </Link>
+            <Link
+              href="/plan"
+              className="hover-rise inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-slate-300/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-none transition-all duration-200 ease-out hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 motion-reduce:transition-none sm:w-auto"
+            >
+              <CreditCard className="h-4 w-4" />
+              Plan
+            </Link>
+            <Link
+              href="/collaboration"
+              className="hover-rise inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-slate-300/70 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700 shadow-none transition-all duration-200 ease-out hover:border-slate-400/70 hover:bg-white dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 motion-reduce:transition-none sm:w-auto"
+            >
+              <Users className="h-4 w-4" />
+              Collaboration
+            </Link>
             <div className="relative z-50 col-span-2 w-full sm:col-span-1 sm:w-auto" ref={notificationsRef}>
               <button
                 type="button"
@@ -759,12 +763,12 @@ export function DashboardDashboard() {
                           All ({notifications.length})
                         </button>
                       </div>
-                      <a
+                      <Link
                         href="/profile"
                         className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                       >
                         Manage alerts
-                      </a>
+                      </Link>
                     </div>
                   </div>
 
@@ -852,12 +856,12 @@ export function DashboardDashboard() {
                       ))
                     )}
                   </div>
-                  <a
+                  <Link
                     href="/transactions"
                     className="m-3 mt-1 block rounded-xl border border-slate-200 bg-white/85 px-3 py-2 text-center text-xs font-semibold text-slate-700 transition-all duration-200 ease-out hover:bg-white hover:shadow-sm dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-900 motion-reduce:transition-none"
                   >
                     Open transactions dashboard
-                  </a>
+                  </Link>
                 </div>
                 </>
               ) : null}

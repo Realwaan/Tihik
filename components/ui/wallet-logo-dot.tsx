@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { buildBrandfetchLogoProxySource } from "@/lib/brandfetch-logo";
 import type { WalletBadge } from "@/lib/wallet-badges";
@@ -42,21 +42,24 @@ export function WalletLogoDot({
   imageClassName = "absolute inset-[1px] h-[calc(100%-2px)] w-[calc(100%-2px)] rounded-full object-contain",
 }: WalletLogoDotProps) {
   const sources = useMemo(() => buildLogoSources(badge), [badge]);
-  const [sourceIndex, setSourceIndex] = useState(() => (sources.length > 0 ? 0 : -1));
-  const source = sourceIndex >= 0 ? sources[sourceIndex] : null;
-
-  useEffect(() => {
-    setSourceIndex(sources.length > 0 ? 0 : -1);
-  }, [sources]);
+  const [failedSources, setFailedSources] = useState<Set<string>>(new Set());
+  const sourceNamespace = label.trim().toLowerCase() || "wallet-logo-dot";
+  const source =
+    sources.find((candidate) => !failedSources.has(`${sourceNamespace}:${candidate}`)) ?? null;
 
   const advanceSource = () => {
-    setSourceIndex((currentIndex) => {
-      if (currentIndex < 0) {
-        return -1;
-      }
+    if (!source) {
+      return;
+    }
 
-      const nextIndex = currentIndex + 1;
-      return nextIndex < sources.length ? nextIndex : -1;
+    const sourceKey = `${sourceNamespace}:${source}`;
+    setFailedSources((currentFailed) => {
+      if (currentFailed.has(sourceKey)) {
+        return currentFailed;
+      }
+      const nextFailed = new Set(currentFailed);
+      nextFailed.add(sourceKey);
+      return nextFailed;
     });
   };
 

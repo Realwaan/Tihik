@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CreditCard } from "lucide-react";
 
 import { buildBrandfetchLogoProxySource } from "@/lib/brandfetch-logo";
@@ -65,8 +65,10 @@ export function WalletBrandLogo({
   className = "",
 }: WalletBrandLogoProps) {
   const sources = useMemo(() => buildLogoSources(badge, label), [badge, label]);
-  const [sourceIndex, setSourceIndex] = useState(() => (sources.length > 0 ? 0 : -1));
-  const source = sourceIndex >= 0 ? sources[sourceIndex] : null;
+  const [failedSources, setFailedSources] = useState<Set<string>>(new Set());
+  const sourceNamespace = label.trim().toLowerCase() || "wallet-brand-logo";
+  const source =
+    sources.find((candidate) => !failedSources.has(`${sourceNamespace}:${candidate}`)) ?? null;
   const gradientClass = badge?.logoGradientClass ?? "from-slate-400 to-slate-600";
   const normalizedLabelText = label
     .trim()
@@ -76,18 +78,19 @@ export function WalletBrandLogo({
   const fallbackText =
     badge?.logoText ?? (normalizedLabelText || "WL");
 
-  useEffect(() => {
-    setSourceIndex(sources.length > 0 ? 0 : -1);
-  }, [sources]);
-
   const advanceSource = () => {
-    setSourceIndex((currentIndex) => {
-      if (currentIndex < 0) {
-        return -1;
-      }
+    if (!source) {
+      return;
+    }
 
-      const nextIndex = currentIndex + 1;
-      return nextIndex < sources.length ? nextIndex : -1;
+    const sourceKey = `${sourceNamespace}:${source}`;
+    setFailedSources((currentFailed) => {
+      if (currentFailed.has(sourceKey)) {
+        return currentFailed;
+      }
+      const nextFailed = new Set(currentFailed);
+      nextFailed.add(sourceKey);
+      return nextFailed;
     });
   };
 

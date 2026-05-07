@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
+import Link from "next/link";
 import { AiAssistantWidget } from "@/components/ai-assistant-widget";
 import { ToastProvider } from "@/components/toast-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -64,12 +65,12 @@ export default async function RootLayout({
               <ClerkTopBarVisibility>
                 <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/85 backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/80">
                   <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-                    <a
+                    <Link
                       href="/"
                       className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-600 dark:text-amber-400"
                     >
                       TrackIt
-                    </a>
+                    </Link>
 
                     <div className="flex items-center gap-2 sm:gap-3">
                       <ThemeToggle />
