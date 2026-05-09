@@ -77,10 +77,12 @@ export default async function RootLayout({
                     <ThemeToggle />
 
                     {isAuthenticated ? (
-                      <ProfilePopupForm
-                        initialName={session?.user?.name}
-                        initialEmail={session?.user?.email}
-                      />
+                      <>
+                        <ProfilePopupForm
+                          initialName={session?.user?.name}
+                          initialEmail={session?.user?.email}
+                        />
+                      </>
                     ) : (
                       <>
                         <SignInButton />
