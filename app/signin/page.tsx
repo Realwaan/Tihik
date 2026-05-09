@@ -4,8 +4,8 @@ import { AuthShell } from "@/components/layout/auth-shell";
 export default function SignInPage() {
   return (
     <AuthShell
-      title="Get back to your money flow"
-      description="Track spending trends, recurring bills, and collaboration updates in one focused workspace."
+      title="Return to your financial workspace"
+      description="Sign in to review budgets, recurring payments, and shared activity without the usual clutter."
     >
       <SignInForm />
     </AuthShell>

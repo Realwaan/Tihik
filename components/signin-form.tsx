@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, Sparkles } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 
 import { useToast } from "@/components/toast-provider";
 import { Button } from "@/components/ui/button";
@@ -87,24 +87,18 @@ export function SignInForm() {
 
   return (
     <div className="w-full max-w-xl px-1 sm:px-0">
-      <Card className="overflow-hidden border-slate-200/90 bg-white/95 shadow-xl dark:border-slate-700/80 dark:bg-slate-900/95">
-        <CardHeader className="relative overflow-hidden border-b border-slate-200/70 pb-6 dark:border-slate-800/70">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.18),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(250,204,21,0.16),transparent_40%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.2),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(250,204,21,0.14),transparent_40%)]" />
-          <div className="relative flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-600 dark:text-amber-400">TrackIt access</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Welcome back</h1>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Sign in to continue to your dashboard.</p>
-            </div>
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/80 bg-white/85 text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200">
-              <Sparkles className="h-5 w-5" />
-            </span>
-          </div>
+      <Card className="overflow-hidden rounded-[2rem] border-slate-200/90 bg-white/96 shadow-[0_24px_70px_rgba(15,23,42,0.08)] dark:border-slate-800/80 dark:bg-slate-950/95">
+        <CardHeader className="border-b border-slate-200/70 pb-6 dark:border-slate-800/70">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">Secure sign-in</p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 dark:text-slate-50">Welcome back</h1>
+          <p className="mt-2 max-w-md text-sm leading-6 text-slate-600 dark:text-slate-400">
+            Pick up where you left off and return to your budget, bills, and shared transactions.
+          </p>
         </CardHeader>
 
         <CardContent className="pt-6">
           {verifyEmail ? (
-            <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 dark:border-emerald-800/70 dark:bg-emerald-900/25">
+            <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-800/70 dark:bg-emerald-900/25">
               <p className="text-sm font-medium text-emerald-900 dark:text-emerald-300">
                 Account created for {verifyEmail}. Use the same credentials to sign in.
               </p>
@@ -112,14 +106,16 @@ export function SignInForm() {
           ) : null}
 
           {error ? (
-            <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-3.5 dark:border-rose-800/70 dark:bg-rose-900/25">
+            <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-800/70 dark:bg-rose-900/25">
               <p className="text-sm font-medium text-rose-900 dark:text-rose-300">{error}</p>
             </div>
           ) : null}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-800 dark:text-slate-200">Email</Label>
+              <Label htmlFor="email" className="text-slate-800 dark:text-slate-200">
+                Email
+              </Label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <Input
@@ -130,15 +126,17 @@ export function SignInForm() {
                   disabled={loading || googleLoading}
                   placeholder="you@example.com"
                   autoComplete="email"
-                  className="h-11 rounded-xl pl-10"
+                  className="h-12 rounded-2xl border-slate-300 bg-white pl-10 shadow-sm dark:border-slate-700 dark:bg-slate-950"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-800 dark:text-slate-200">Password</Label>
+              <Label htmlFor="password" className="text-slate-800 dark:text-slate-200">
+                Password
+              </Label>
               <div className="relative">
-                <Lock className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                <Lock className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <Input
                   id="password"
                   name="password"
@@ -147,7 +145,7 @@ export function SignInForm() {
                   disabled={loading || googleLoading}
                   placeholder="Enter your password"
                   autoComplete="current-password"
-                  className="h-11 rounded-xl px-10"
+                  className="h-12 rounded-2xl border-slate-300 bg-white pl-12 pr-11 shadow-sm dark:border-slate-700 dark:bg-slate-950"
                 />
                 <button
                   type="button"
@@ -163,7 +161,7 @@ export function SignInForm() {
             <Button
               type="submit"
               disabled={loading || googleLoading}
-              className="mt-1 h-11 w-full rounded-xl bg-blue-600 text-base font-semibold text-white hover:bg-blue-700"
+              className="mt-1 h-12 w-full rounded-2xl bg-slate-950 text-base font-semibold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-slate-200"
             >
               {loading ? (
                 <>
@@ -183,7 +181,7 @@ export function SignInForm() {
                 <div className="w-full border-t border-slate-200 dark:border-slate-700" />
               </div>
               <div className="relative flex justify-center">
-                <span className="bg-white px-2 text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:bg-slate-900/95 dark:text-slate-400">
+                <span className="bg-white px-2 text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:bg-slate-950/95 dark:text-slate-400">
                   Or continue with
                 </span>
               </div>
@@ -194,7 +192,7 @@ export function SignInForm() {
               variant="outline"
               onClick={handleGoogleSignIn}
               disabled={loading || googleLoading}
-              className="h-11 w-full rounded-xl border-slate-300 text-base font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800"
+              className="h-12 w-full rounded-2xl border-slate-300 bg-white text-base font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
             >
               {googleLoading ? (
                 <>
@@ -218,7 +216,7 @@ export function SignInForm() {
           <div className="mt-6 flex items-center justify-between gap-3 border-t border-slate-200 pt-4 text-sm dark:border-slate-800">
             <p className="text-slate-600 dark:text-slate-400">
               Need an account?{" "}
-              <Link href="/signup" className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+              <Link href="/signup" className="font-semibold text-slate-950 hover:text-slate-700 dark:text-slate-100 dark:hover:text-white">
                 Sign up
               </Link>
             </p>
